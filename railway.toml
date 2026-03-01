@@ -1,7 +1,7 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
 
 [deploy]
-startCommand = "python3.11 -u bot.py"
+startCommand = "python -u bot.py"
 restartPolicyType = "always"
 restartPolicyMaxRetries = 5
