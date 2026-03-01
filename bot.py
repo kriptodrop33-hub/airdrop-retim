@@ -95,25 +95,101 @@ async def unsplash_image(query: str) -> str:
 # GPT FONKSİYONLARI
 # ══════════════════════════════════════════════════════
 
-async def gpt_find_airdrops() -> list[dict]:
-    prompt = """Sen bir kripto para airdrop uzmanısın. Şu an aktif veya yakında başlayacak,
-Türkiye'den katılılabilecek 5 adet gerçekçi kripto airdrop öner.
+async def fetch_real_airdrops() -> list[dict]:
+    """CoinGecko + DeFiLlama ücretsiz API ile gerçek proje verisi çek"""
+    projects = []
+    
+    # CoinGecko — trending coinleri çek (ücretsiz, key yok)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://api.coingecko.com/api/v3/search/trending",
+                headers={"accept": "application/json"}
+            )
+            data = resp.json()
+            for item in data.get("coins", [])[:8]:
+                c = item["item"]
+                projects.append({
+                    "name": c.get("name", ""),
+                    "symbol": c.get("symbol", ""),
+                    "coingecko_id": c.get("id", ""),
+                    "thumb": c.get("large", ""),
+                    "market_cap_rank": c.get("market_cap_rank", 999),
+                })
+    except Exception as e:
+        logger.warning(f"CoinGecko trending hatası: {e}")
 
-SADECE JSON döndür, başka hiçbir şey yazma:
+    # DeFiLlama — en yüksek TVL kazançlı protokoller
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get("https://yields.llama.fi/pools")
+            pools = resp.json().get("data", [])
+            # En yüksek APY'li ilk 5 pool
+            top = sorted(
+                [p for p in pools if p.get("apy", 0) > 50 and p.get("tvlUsd", 0) > 1_000_000],
+                key=lambda x: x.get("apy", 0), reverse=True
+            )[:5]
+            for p in top:
+                projects.append({
+                    "name": p.get("project", ""),
+                    "symbol": p.get("symbol", ""),
+                    "chain": p.get("chain", ""),
+                    "apy": round(p.get("apy", 0), 1),
+                    "tvl": p.get("tvlUsd", 0),
+                    "type": "yield"
+                })
+    except Exception as e:
+        logger.warning(f"DeFiLlama hatası: {e}")
+
+    return projects
+
+
+async def gpt_find_airdrops() -> list[dict]:
+    """Gerçek verilerle zenginleştirilmiş airdrop listesi üret"""
+    real_data = await fetch_real_airdrops()
+    
+    # Gerçek veriyi GPT'ye ver, analiz ettir
+    real_summary = ""
+    if real_data:
+        real_summary = "\n\nŞu an trend olan gerçek projeler (bunları kullanabilirsin):\n"
+        for p in real_data[:6]:
+            if p.get("type") == "yield":
+                real_summary += f"- {p['name']} ({p['symbol']}) — Chain: {p.get('chain','')} APY: %{p.get('apy',0)}\n"
+            else:
+                real_summary += f"- {p['name']} ({p['symbol']}) — CoinGecko rank: {p.get('market_cap_rank','')}\n"
+
+    prompt = f"""Sen bir kripto para airdrop uzmanısın. 2024-2025 döneminde aktif olan GERÇEK kripto airdroplarından 5 tanesini öner.
+
+KRİTERLER:
+- Platform bazlı değil, kripto ekosistemindeki GERÇEK projeler (Layer2, DeFi, DEX, CEX, bridge, wallet)
+- Özellikle REFERANS sistemi olan airdroplar (arkadaş davet et → ekstra puan/token kazan)
+- Türkiye'den katılılabilen
+- Somut katılım adımları olan (görev yap, token al mantığı)
+- Örnek türler: borsa airdropları, L2 testnet, DeFi protokolü, NFT mint, galxe/zealy görevi
+{real_summary}
+
+Her biri için detaylı bilgi ver. SADECE JSON döndür:
 [
-  {
-    "name": "Proje Adı",
-    "url": "",
-    "description": "2 cümle açıklama",
-    "reward": "Tahmini ödül",
-    "difficulty": "Kolay",
+  {{
+    "name": "Gerçek Proje Adı",
+    "category": "DEX/CEX/L2/Bridge/Wallet/DeFi",
+    "url": "https://gerçek-resmi-site.com",
+    "campaign_url": "https://doğrudan-katılım-linki.com",
+    "description": "Projenin ne yaptığı ve neden önemli olduğu (2-3 cümle)",
+    "how_to_join": "Adım adım nasıl katılınır",
+    "reward": "Tahmini token/$ ödül miktarı",
+    "referral": true,
+    "referral_bonus": "Referans başına ne kadar bonus",
+    "difficulty": "Kolay/Orta/Zor",
+    "time_required": "Tahmini süre (ör: 15 dakika)",
+    "deadline": "Son tarih veya sürekli",
     "score": 8,
-    "score_reason": "Neden bu puanı aldı"
-  }
+    "score_reason": "Neden bu puan: güvenilirlik + potansiyel"
+  }}
 ]"""
-    raw = await gpt_text(prompt, max_tokens=1200)
+
+    raw = await gpt_text(prompt, max_tokens=2000)
     raw = raw.strip()
-    # JSON bloğunu temizle
     if "```" in raw:
         parts = raw.split("```")
         for part in parts:
@@ -130,6 +206,7 @@ SADECE JSON döndür, başka hiçbir şey yazma:
         if start != -1:
             raw = raw[start:end]
     return json.loads(raw)
+
 
 
 async def gpt_make_post(airdrop: dict, ref: str = None) -> str:
@@ -278,22 +355,67 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def scan(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
-    await update.message.reply_text("🔍 AI 5 airdrop tarıyor...")
+    msg = await update.message.reply_text(
+        "🔍 Kripto ekosistemi taranıyor...\n"
+        "📡 CoinGecko & DeFiLlama verisi çekiliyor...\n"
+        "🤖 AI analiz yapıyor..."
+    )
     try:
         airdrops = await gpt_find_airdrops()
         ctx.user_data["scan_results"] = airdrops
-        msg = "🪂 *Bulunan Airdroplar:*\n\n"
-        buttons = []
+        await msg.delete()
+
         for i, a in enumerate(airdrops):
-            score = a.get("score", "?")
-            stars = "⭐" * min(int(score), 5) if isinstance(score, int) else "📌"
-            msg += f"*{i+1}. {a['name']}*\n├ {a['description']}\n├ 💰 {a['reward']}\n├ ⚡ {a['difficulty']}\n└ {stars} {score}/10\n\n"
-            buttons.append([InlineKeyboardButton(f"{i+1}. {a['name']} ({score}/10) → Seç", callback_data=f"prepare|{i}")])
-        buttons.append([InlineKeyboardButton("🤖 AI En İyisini Seçsin", callback_data="autopick_from_scan")])
-        msg += "⬇️ Bir projeyi seçince senden *link isteyeceğim.*"
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+            score     = a.get("score", "?")
+            stars     = "⭐" * min(int(score), 10) if isinstance(score, int) else "⭐"
+            ref_badge = "🔁 Referans Sistemi VAR" if a.get("referral") else "➖ Referans yok"
+            cat       = a.get("category", "")
+            deadline  = a.get("deadline", "Belirtilmemiş")
+            time_req  = a.get("time_required", "?")
+            campaign  = a.get("campaign_url") or a.get("url", "")
+
+            card = (
+                f"{'━'*30}\n"
+                f"🪂 <b>{i+1}. {a['name']}</b>  <code>[{cat}]</code>\n"
+                f"{'━'*30}\n\n"
+                f"📝 {a.get('description','')}\n\n"
+                f"📋 <b>Nasıl Katılınır:</b>\n{a.get('how_to_join','')}\n\n"
+                f"💰 <b>Ödül:</b> {a.get('reward','?')}\n"
+                f"{ref_badge}\n"
+            )
+            if a.get("referral_bonus"):
+                card += f"🎁 <b>Referans Bonusu:</b> {a['referral_bonus']}\n"
+            card += (
+                f"⚡ <b>Zorluk:</b> {a.get('difficulty','?')}  •  "
+                f"⏱ <b>Süre:</b> {time_req}\n"
+                f"📅 <b>Son Tarih:</b> {deadline}\n\n"
+                f"{stars} <b>Puan: {score}/10</b> — {a.get('score_reason','')}\n"
+            )
+            if campaign:
+                card += f"\n🔗 <a href='{campaign}'>Kampanya Sayfası</a>"
+
+            # Her airdrop için ayrı kart + buton
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton(f"📢 Bu Airdropu Paylaş ({score}/10)", callback_data=f"prepare|{i}")
+            ]])
+            await update.message.reply_text(
+                card,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=keyboard
+            )
+
+        # Alt özet + autopick butonu
+        await update.message.reply_text(
+            f"✅ <b>{len(airdrops)} airdrop bulundu.</b>\n\n"
+            "Yukarıdan istediğini seç veya AI en iyisini seçsin:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🤖 AI En İyisini Seçsin", callback_data="autopick_from_scan")
+            ]])
+        )
     except Exception as e:
-        await update.message.reply_text(f"❌ Hata: {e}")
+        await update.message.reply_text(f"❌ Hata: {e}\n\nGroq API veya JSON parse hatası olabilir, tekrar dene.")
 
 
 async def autopick(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -372,14 +494,21 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if idx < len(airdrops):
             await query.edit_message_reply_markup(None)
             airdrop = airdrops[idx]
-            ctx.user_data["pending_airdrop"] = airdrop
-            ctx.user_data["awaiting_link"] = True
-            await ctx.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=f"🔗 *{airdrop['name']}* için katılım linkini gönder:\n\n"
-                     f"(Linki buraya yapıştır, bot postu hazırlayacak)",
-                parse_mode="Markdown"
-            )
+            # campaign_url veya url varsa direkt kullan, yoksa sor
+            url = airdrop.get("campaign_url") or airdrop.get("url", "")
+            if url and url.startswith("http"):
+                airdrop["url"] = url
+                ctx.user_data["pending_airdrop"] = None
+                await _prepare_and_show(query, ctx, airdrop)
+            else:
+                ctx.user_data["pending_airdrop"] = airdrop
+                ctx.user_data["awaiting_link"] = True
+                await ctx.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"🔗 <b>{airdrop['name']}</b> için katılım linkini gönder:\n\n"
+                         f"(Kampanya veya katılım linkini yapıştır)",
+                    parse_mode="HTML"
+                )
         return
 
     if data == "autopick_from_scan":
@@ -387,14 +516,20 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if airdrops:
             best = max(airdrops, key=lambda x: x.get("score", 0))
             await query.edit_message_reply_markup(None)
-            ctx.user_data["pending_airdrop"] = best
-            ctx.user_data["awaiting_link"] = True
-            await ctx.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=f"🤖 AI en iyi projeyi seçti: *{best['name']}*\n\n"
-                     f"🔗 Katılım linkini gönder:",
-                parse_mode="Markdown"
-            )
+            url = best.get("campaign_url") or best.get("url", "")
+            if url and url.startswith("http"):
+                best["url"] = url
+                ctx.user_data["pending_airdrop"] = None
+                await _prepare_and_show(query, ctx, best)
+            else:
+                ctx.user_data["pending_airdrop"] = best
+                ctx.user_data["awaiting_link"] = True
+                await ctx.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"🤖 AI en iyi projeyi seçti: <b>{best['name']}</b>\n\n"
+                         f"🔗 Katılım linkini gönder:",
+                    parse_mode="HTML"
+                )
         return
 
     if data.startswith("send|"):
