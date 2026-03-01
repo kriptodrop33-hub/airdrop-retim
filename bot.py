@@ -22,7 +22,7 @@ GROUP_CHAT_ID       = int(os.getenv("GROUP_CHAT_ID", "0"))
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY", "")
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # ── State ──────────────────────────────────────────────
 ref_code_store = {"code": None}
@@ -103,7 +103,7 @@ SADECE JSON döndür, başka hiçbir şey yazma:
 [
   {
     "name": "Proje Adı",
-    "url": "https://...",
+    "url": "",
     "description": "2 cümle açıklama",
     "reward": "Tahmini ödül",
     "difficulty": "Kolay",
@@ -133,24 +133,37 @@ SADECE JSON döndür, başka hiçbir şey yazma:
 
 
 async def gpt_make_post(airdrop: dict, ref: str = None) -> str:
+    import re
     score_line = f"Puan: {airdrop.get('score','?')}/10 — {airdrop.get('score_reason','')}" if airdrop.get('score') != '?' else ""
     prompt = f"""Türk kripto topluluğu için bu airdrop hakkında emojili, heyecan verici Telegram duyurusu yaz.
 HTML formatı kullan: <b>kalın</b>, <i>italik</i>, <code>kod</code>
 
 Proje: {airdrop['name']}
-URL: {airdrop['url']}
 Açıklama: {airdrop.get('description','')}
 Ödül: {airdrop.get('reward','?')}
 Zorluk: {airdrop.get('difficulty','?')}
 {score_line}
 
 Format: 🚀 Başlık → Giriş → 📋 Adımlar → 💰 Ödül → ⭐ Puan
+ÖNEMLİ: Post içine kesinlikle hiçbir URL veya http adresi yazma. Sadece metin ve emoji.
 Kısa ve çarpıcı tut."""
 
     text = await gpt_text(prompt, max_tokens=600)
+
+    # GPT yine de link yazmışsa temizle
+    text = re.sub(r'https?://\S+', '', text).strip()
+
+    # Referans kodu
     if ref:
         text += f"\n\n🎯 <b>Referans Kodu:</b> <code>{ref}</code>"
-    text += f"\n\n🔗 <a href='{airdrop['url']}'>👉 Hemen Katıl</a>"
+
+    # Link — kullanıcının girdiği URL varsa ekle, yoksa placeholder
+    url = airdrop.get('url', '')
+    if url and url not in ('?', '', None):
+        text += f"\n\n🔗 <a href='{url}'>👉 Hemen Katıl</a>"
+    else:
+        text += "\n\n🔗 <b>[ LİNK BURAYA ]</b>"
+
     text += "\n\n📢 @kriptodropptr"
     return text
 
@@ -275,8 +288,9 @@ async def scan(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             score = a.get("score", "?")
             stars = "⭐" * min(int(score), 5) if isinstance(score, int) else "📌"
             msg += f"*{i+1}. {a['name']}*\n├ {a['description']}\n├ 💰 {a['reward']}\n├ ⚡ {a['difficulty']}\n└ {stars} {score}/10\n\n"
-            buttons.append([InlineKeyboardButton(f"{i+1}. {a['name']} ({score}/10) → Hazırla", callback_data=f"prepare|{i}")])
+            buttons.append([InlineKeyboardButton(f"{i+1}. {a['name']} ({score}/10) → Seç", callback_data=f"prepare|{i}")])
         buttons.append([InlineKeyboardButton("🤖 AI En İyisini Seçsin", callback_data="autopick_from_scan")])
+        msg += "⬇️ Bir projeyi seçince senden *link isteyeceğim.*"
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
     except Exception as e:
         await update.message.reply_text(f"❌ Hata: {e}")
@@ -357,7 +371,15 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         airdrops = ctx.user_data.get("scan_results", [])
         if idx < len(airdrops):
             await query.edit_message_reply_markup(None)
-            await _prepare_and_show(query, ctx, airdrops[idx])
+            airdrop = airdrops[idx]
+            ctx.user_data["pending_airdrop"] = airdrop
+            ctx.user_data["awaiting_link"] = True
+            await ctx.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"🔗 *{airdrop['name']}* için katılım linkini gönder:\n\n"
+                     f"(Linki buraya yapıştır, bot postu hazırlayacak)",
+                parse_mode="Markdown"
+            )
         return
 
     if data == "autopick_from_scan":
@@ -365,7 +387,14 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if airdrops:
             best = max(airdrops, key=lambda x: x.get("score", 0))
             await query.edit_message_reply_markup(None)
-            await _prepare_and_show(query, ctx, best)
+            ctx.user_data["pending_airdrop"] = best
+            ctx.user_data["awaiting_link"] = True
+            await ctx.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"🤖 AI en iyi projeyi seçti: *{best['name']}*\n\n"
+                     f"🔗 Katılım linkini gönder:",
+                parse_mode="Markdown"
+            )
         return
 
     if data.startswith("send|"):
@@ -483,6 +512,30 @@ async def status(update, ctx):
         parse_mode="Markdown"
     )
 
+
+async def link_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Kullanıcının gönderdiği linki yakala, post hazırla"""
+    if update.effective_chat.id != ADMIN_CHAT_ID:
+        return
+    if not ctx.user_data.get("awaiting_link"):
+        return
+
+    text = update.message.text.strip()
+
+    # Link mi kontrol et
+    if not text.startswith("http"):
+        await update.message.reply_text("⚠️ Geçerli bir link gönder (http ile başlamalı)")
+        return
+
+    ctx.user_data["awaiting_link"] = False
+    airdrop = ctx.user_data.get("pending_airdrop", {})
+    airdrop["url"] = text
+    ctx.user_data["pending_airdrop"] = None
+
+    await update.message.reply_text(f"✅ Link alındı! Post hazırlanıyor...")
+    await _prepare_and_show(update, ctx, airdrop)
+
+
 async def help_command(update, ctx):
     if not is_admin(update): return
     await update.message.reply_text(
@@ -524,6 +577,8 @@ def main():
         app.add_handler(CommandHandler(cmd, fn))
 
     app.add_handler(CallbackQueryHandler(callback_handler))
+    # Link mesajlarını yakala (komut değil, düz mesaj)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, link_handler))
 
     logger.info("🚀 Polling başlıyor...")
     app.run_polling(allowed_updates=["message", "callback_query"])
