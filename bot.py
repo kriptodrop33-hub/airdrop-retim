@@ -15,17 +15,14 @@ logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 load_dotenv()
 
-BOT_TOKEN         = os.getenv("BOT_TOKEN", "")
-OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY", "")
-ADMIN_CHAT_ID     = int(os.getenv("ADMIN_CHAT_ID", "0"))
-GROUP_CHAT_ID     = int(os.getenv("GROUP_CHAT_ID", "0"))
+BOT_TOKEN           = os.getenv("BOT_TOKEN", "")
+GROQ_API_KEY        = os.getenv("GROQ_API_KEY", "")
+ADMIN_CHAT_ID       = int(os.getenv("ADMIN_CHAT_ID", "0"))
+GROUP_CHAT_ID       = int(os.getenv("GROUP_CHAT_ID", "0"))
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY", "")
 
-from openai import AsyncOpenAI
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-
-openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # ── State ──────────────────────────────────────────────
 ref_code_store = {"code": None}
@@ -34,97 +31,123 @@ pending_posts  = {}
 
 
 # ══════════════════════════════════════════════════════
-# UNSPLASH GÖRSEL
-# ══════════════════════════════════════════════════════
-
-async def unsplash_image(query: str) -> str | None:
-    if not UNSPLASH_ACCESS_KEY:
-        logger.warning("UNSPLASH_ACCESS_KEY tanımlı değil, varsayılan görsel kullanılıyor.")
-        return "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1200"
-
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                "https://api.unsplash.com/search/photos",
-                params={
-                    "query": f"{query} cryptocurrency blockchain",
-                    "per_page": 1,
-                    "orientation": "landscape",
-                    "client_id": UNSPLASH_ACCESS_KEY
-                }
-            )
-            data = resp.json()
-            results = data.get("results", [])
-            if results:
-                return results[0]["urls"]["regular"]
-    except Exception as e:
-        logger.warning(f"Unsplash hatası: {e}")
-
-    # Fallback: sabit kripto görseli
-    return "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1200"
-
-
-# ══════════════════════════════════════════════════════
-# GPT YARDIMCILARI
+# GROQ API (Ücretsiz)
 # ══════════════════════════════════════════════════════
 
 async def gpt_text(prompt: str, max_tokens: int = 800) -> str:
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens
-    )
-    return response.choices[0].message.content.strip()
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",  # Groq'un en iyi ücretsiz modeli
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": 0.8
+            }
+        )
+        data = resp.json()
+        if "error" in data:
+            raise Exception(data["error"]["message"])
+        return data["choices"][0]["message"]["content"].strip()
 
+
+# ══════════════════════════════════════════════════════
+# UNSPLASH GÖRSEL
+# ══════════════════════════════════════════════════════
+
+FALLBACK_IMAGES = [
+    "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1200",
+    "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200",
+    "https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=1200",
+    "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200",
+]
+
+async def unsplash_image(query: str) -> str:
+    if UNSPLASH_ACCESS_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    "https://api.unsplash.com/search/photos",
+                    params={
+                        "query": f"{query} cryptocurrency crypto blockchain",
+                        "per_page": 1,
+                        "orientation": "landscape",
+                        "client_id": UNSPLASH_ACCESS_KEY
+                    }
+                )
+                results = resp.json().get("results", [])
+                if results:
+                    return results[0]["urls"]["regular"]
+        except Exception as e:
+            logger.warning(f"Unsplash hatası: {e}")
+
+    # Fallback: sabit görsel listesinden seç
+    import hashlib
+    idx = int(hashlib.md5(query.encode()).hexdigest(), 16) % len(FALLBACK_IMAGES)
+    return FALLBACK_IMAGES[idx]
+
+
+# ══════════════════════════════════════════════════════
+# GPT FONKSİYONLARI
+# ══════════════════════════════════════════════════════
 
 async def gpt_find_airdrops() -> list[dict]:
-    prompt = """
-Sen bir kripto para airdrop uzmanısın. Şu an aktif veya yakında başlayacak,
-Türkiye'den katılılabilecek 5 adet dikkat çekici kripto airdrop öner.
+    prompt = """Sen bir kripto para airdrop uzmanısın. Şu an aktif veya yakında başlayacak,
+Türkiye'den katılılabilecek 5 adet gerçekçi kripto airdrop öner.
 
-Her biri için JSON formatında dön:
+SADECE JSON döndür, başka hiçbir şey yazma:
 [
   {
     "name": "Proje Adı",
     "url": "https://...",
     "description": "2 cümle açıklama",
-    "reward": "Tahmini ödül bilgisi",
-    "difficulty": "Kolay/Orta/Zor",
+    "reward": "Tahmini ödül",
+    "difficulty": "Kolay",
     "score": 8,
     "score_reason": "Neden bu puanı aldı"
   }
-]
-
-Sadece JSON döndür, başka hiçbir şey yazma. Gerçekçi projeler seç.
-"""
+]"""
     raw = await gpt_text(prompt, max_tokens=1200)
-    raw = raw.strip().strip("```").strip()
-    if raw.startswith("json"):
-        raw = raw[4:].strip()
+    raw = raw.strip()
+    # JSON bloğunu temizle
+    if "```" in raw:
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("["):
+                raw = part
+                break
+    raw = raw.strip()
+    if not raw.startswith("["):
+        start = raw.find("[")
+        end   = raw.rfind("]") + 1
+        if start != -1:
+            raw = raw[start:end]
     return json.loads(raw)
 
 
 async def gpt_make_post(airdrop: dict, ref: str = None) -> str:
-    prompt = f"""
-Şu kripto airdrop için Türkçe, emojili, heyecan verici bir Telegram duyurusu yaz.
-HTML formatı kullan (<b>, <i>, <code> kabul edilir).
+    score_line = f"Puan: {airdrop.get('score','?')}/10 — {airdrop.get('score_reason','')}" if airdrop.get('score') != '?' else ""
+    prompt = f"""Türk kripto topluluğu için bu airdrop hakkında emojili, heyecan verici Telegram duyurusu yaz.
+HTML formatı kullan: <b>kalın</b>, <i>italik</i>, <code>kod</code>
 
 Proje: {airdrop['name']}
 URL: {airdrop['url']}
-Açıklama: {airdrop.get('description', '')}
-Tahmini Ödül: {airdrop.get('reward', '?')}
-Zorluk: {airdrop.get('difficulty', '?')}
-Puan: {airdrop.get('score', '?')}/10
+Açıklama: {airdrop.get('description','')}
+Ödül: {airdrop.get('reward','?')}
+Zorluk: {airdrop.get('difficulty','?')}
+{score_line}
 
-Format:
-🚀 Çarpıcı başlık
-Kısa giriş (1-2 cümle)
-📋 Nasıl Katılınır (adım adım)
-💰 Ödül bilgisi
-⭐ Puan ve kısa yorum
-Link ve kanal etiketi sona gelsin.
-"""
-    text = await gpt_text(prompt, max_tokens=700)
+Format: 🚀 Başlık → Giriş → 📋 Adımlar → 💰 Ödül → ⭐ Puan
+Kısa ve çarpıcı tut."""
+
+    text = await gpt_text(prompt, max_tokens=600)
     if ref:
         text += f"\n\n🎯 <b>Referans Kodu:</b> <code>{ref}</code>"
     text += f"\n\n🔗 <a href='{airdrop['url']}'>👉 Hemen Katıl</a>"
@@ -135,8 +158,7 @@ Link ve kanal etiketi sona gelsin.
 async def gpt_score_url(url: str) -> str:
     return await gpt_text(
         f"Bu kripto airdrop projesini Türkçe analiz et ve puanla: {url}\n\n"
-        "⭐ Genel Puan /10, 🔒 Güvenilirlik, 💰 Kazanç Potansiyeli, "
-        "⚡ Zorluk, ⚠️ Riskler, ✅ Artılar, ❌ Eksiler, 🎯 Tavsiye. "
+        "⭐ Puan /10 | 🔒 Güvenilirlik | 💰 Kazanç | ⚡ Zorluk | ⚠️ Risk | ✅ Artı | ❌ Eksi | 🎯 Tavsiye\n"
         "Emojili ve net yaz.",
         max_tokens=500
     )
@@ -153,17 +175,22 @@ def is_admin(update: Update) -> bool:
 async def _prepare_and_show(update, ctx: ContextTypes.DEFAULT_TYPE, airdrop: dict):
     ref = ref_code_store.get("code")
 
-    # update hem Update hem CallbackQuery olabilir
-    reply = update.message.reply_text if hasattr(update, "message") and update.message else \
-            update.reply_text if hasattr(update, "reply_text") else \
-            (lambda *a, **k: None)
+    async def reply_text(text, **kwargs):
+        if hasattr(update, "message") and update.message:
+            return await update.message.reply_text(text, **kwargs)
+        return await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, **kwargs)
 
-    status_msg = await reply(
+    async def reply_photo(photo, caption, **kwargs):
+        if hasattr(update, "message") and update.message:
+            return await update.message.reply_photo(photo=photo, caption=caption, **kwargs)
+        return await ctx.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=photo, caption=caption, **kwargs)
+
+    status_msg = await reply_text(
         f"⚙️ *{airdrop['name']}* hazırlanıyor...\n✍️ Post yazılıyor...",
         parse_mode="Markdown"
     )
 
-    post_text = await gpt_make_post(airdrop, ref)
+    post_text  = await gpt_make_post(airdrop, ref)
 
     await status_msg.edit_text(
         f"⚙️ *{airdrop['name']}* hazırlanıyor...\n✅ Post yazıldı\n🖼️ Görsel aranıyor...",
@@ -177,34 +204,17 @@ async def _prepare_and_show(update, ctx: ContextTypes.DEFAULT_TYPE, airdrop: dic
         parse_mode="Markdown"
     )
 
-    await reply("─── 👁️ ÖNİZLEME ───")
+    await reply_text("─── 👁️ ÖNİZLEME ───")
 
     try:
-        preview_msg = await reply(
-            None,
-            photo=image_url,
-            caption=post_text,
-            parse_mode="HTML"
-        ) if False else None  # foto için aşağıda özel gönderim
-
-        if hasattr(update, "message") and update.message:
-            preview_msg = await update.message.reply_photo(
-                photo=image_url, caption=post_text, parse_mode="HTML"
-            )
-        else:
-            preview_msg = await ctx.bot.send_photo(
-                chat_id=ADMIN_CHAT_ID, photo=image_url, caption=post_text, parse_mode="HTML"
-            )
+        preview_msg = await reply_photo(image_url, post_text, parse_mode="HTML")
     except Exception:
-        if hasattr(update, "message") and update.message:
-            preview_msg = await update.message.reply_text(post_text, parse_mode="HTML", disable_web_page_preview=False)
-        else:
-            preview_msg = await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=post_text, parse_mode="HTML", disable_web_page_preview=False)
+        preview_msg = await reply_text(post_text, parse_mode="HTML", disable_web_page_preview=False)
 
     key = str(preview_msg.message_id)
     pending_posts[key] = {"text": post_text, "image_url": image_url, "name": airdrop["name"]}
 
-    score_line = f"⭐ Puan: {airdrop.get('score','?')}/10 — {airdrop.get('score_reason','')}\n\n" if airdrop.get("score") != "?" else ""
+    score_info = f"⭐ {airdrop.get('score','?')}/10 — {airdrop.get('score_reason','')}\n\n" if airdrop.get("score") not in ("?", None) else ""
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("✅ Gruba Gönder", callback_data=f"send|{key}"),
@@ -212,11 +222,8 @@ async def _prepare_and_show(update, ctx: ContextTypes.DEFAULT_TYPE, airdrop: dic
         InlineKeyboardButton("❌ İptal",          callback_data=f"cancel|{key}")
     ]])
 
-    send = update.message.reply_text if hasattr(update, "message") and update.message else \
-           lambda *a, **k: ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, *a, **k)
-
-    await send(
-        f"⬆️ *{airdrop['name']}* önizlemesi\n\n{score_line}Ne yapmak istersin?",
+    await reply_text(
+        f"⬆️ *{airdrop['name']}* önizlemesi\n\n{score_info}Ne yapmak istersin?",
         parse_mode="Markdown",
         reply_markup=keyboard
     )
@@ -230,31 +237,26 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_chat.id
     adm  = uid == ADMIN_CHAT_ID
     ref  = ref_code_store.get("code") or "Ayarlanmamış"
-    sent = stats_store["sent"]
-    last = stats_store["last"] or "—"
 
     msg = "🪂 *KriptoDropptr Bot*\n━━━━━━━━━━━━━━━━━━━━━\n\n"
     msg += f"{'✅ Admin paneline hoş geldin!' if adm else '⛔ Yetkisiz erişim.'}\n\n"
 
     if adm:
         msg += (
-            f"📊 *Durum*\n├ Ref Kodu: `{ref}`\n├ Gönderim: `{sent}`\n└ Son: `{last}`\n\n"
+            f"📊 *Durum*\n├ Ref Kodu: `{ref}`\n├ Gönderim: `{stats_store['sent']}`\n└ Son: `{stats_store['last'] or '—'}`\n\n"
             "━━━━━━━━━━━━━━━━━━━━━\n🤖 *AI AIRDROP MOTORU*\n━━━━━━━━━━━━━━━━━━━━━\n"
-            "/scan → AI 5 airdrop tara, listele, seç\n"
-            "/autopick → AI en iyisini seçer, hazırlar, sunar\n"
+            "/scan → AI 5 airdrop tara, seç\n"
+            "/autopick → AI en iyisini seçer, hazırlar\n"
             "/analyze `<url>` → Projeyi puanla\n\n"
             "━━━━━━━━━━━━━━━━━━━━━\n📢 *PAYLAŞIM*\n━━━━━━━━━━━━━━━━━━━━━\n"
-            "/newairdrop `<proje>` `<url>` → Özet + görsel + onayla\n"
-            "/quickdrop `<url>` → Sadece URL ver, AI halleder\n"
-            "/scheduledrop `<proje>` `<url>` `<dk>` → Zamanlı gönder\n\n"
+            "/newairdrop `<proje>` `<url>`\n"
+            "/quickdrop `<url>`\n"
+            "/scheduledrop `<proje>` `<url>` `<dk>`\n\n"
             "━━━━━━━━━━━━━━━━━━━━━\n🔗 *REFERANS*\n━━━━━━━━━━━━━━━━━━━━━\n"
             "/setref `<kod>` · /clearref · /showref\n\n"
             "━━━━━━━━━━━━━━━━━━━━━\n📣 *MESAJ & ARAÇLAR*\n━━━━━━━━━━━━━━━━━━━━━\n"
-            "/broadcast `<mesaj>` → Gruba düz mesaj\n"
-            "/boldcast `<mesaj>` → Kalın duyuru\n"
-            "/pin `<mesaj>` → Gönder ve sabitle\n"
-            "/translate `<metin>` → Türkçeye çevir\n"
-            "/hashtag `<proje>` → Hashtag üret\n\n"
+            "/broadcast · /boldcast · /pin\n"
+            "/translate · /hashtag\n\n"
             "━━━━━━━━━━━━━━━━━━━━━\n📈 *İSTATİSTİK*\n━━━━━━━━━━━━━━━━━━━━━\n"
             "/stats · /status"
         )
@@ -267,19 +269,14 @@ async def scan(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         airdrops = await gpt_find_airdrops()
         ctx.user_data["scan_results"] = airdrops
-
         msg = "🪂 *Bulunan Airdroplar:*\n\n"
         buttons = []
         for i, a in enumerate(airdrops):
             score = a.get("score", "?")
-            stars = "⭐" * min(int(score), 10) if isinstance(score, int) else "📌"
+            stars = "⭐" * min(int(score), 5) if isinstance(score, int) else "📌"
             msg += f"*{i+1}. {a['name']}*\n├ {a['description']}\n├ 💰 {a['reward']}\n├ ⚡ {a['difficulty']}\n└ {stars} {score}/10\n\n"
-            buttons.append([InlineKeyboardButton(
-                f"{i+1}. {a['name']} ({score}/10) → Hazırla",
-                callback_data=f"prepare|{i}"
-            )])
+            buttons.append([InlineKeyboardButton(f"{i+1}. {a['name']} ({score}/10) → Hazırla", callback_data=f"prepare|{i}")])
         buttons.append([InlineKeyboardButton("🤖 AI En İyisini Seçsin", callback_data="autopick_from_scan")])
-
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
     except Exception as e:
         await update.message.reply_text(f"❌ Hata: {e}")
@@ -300,8 +297,7 @@ async def post_airdrop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
     if len(ctx.args) < 2:
         await update.message.reply_text("Kullanım: /newairdrop <proje_adı> <url>"); return
-    airdrop = {"name": ctx.args[0], "url": ctx.args[1], "description": "", "reward": "?", "difficulty": "?", "score": "?", "score_reason": ""}
-    await _prepare_and_show(update, ctx, airdrop)
+    await _prepare_and_show(update, ctx, {"name": ctx.args[0], "url": ctx.args[1], "description": "", "reward": "?", "difficulty": "?", "score": "?", "score_reason": ""})
 
 
 async def quick_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -310,8 +306,7 @@ async def quick_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Kullanım: /quickdrop <url>"); return
     url = ctx.args[0]
     domain = url.split("/")[2].replace("www.", "").split(".")[0].capitalize()
-    airdrop = {"name": domain, "url": url, "description": "", "reward": "?", "difficulty": "?", "score": "?", "score_reason": ""}
-    await _prepare_and_show(update, ctx, airdrop)
+    await _prepare_and_show(update, ctx, {"name": domain, "url": url, "description": "", "reward": "?", "difficulty": "?", "score": "?", "score_reason": ""})
 
 
 async def analyze(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -328,8 +323,7 @@ async def schedule_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if len(ctx.args) < 3:
         await update.message.reply_text("Kullanım: /scheduledrop <proje> <url> <dakika>"); return
     project_name, url = ctx.args[0], ctx.args[1]
-    try:
-        minutes = int(ctx.args[2])
+    try: minutes = int(ctx.args[2])
     except ValueError:
         await update.message.reply_text("Dakika sayı olmalı."); return
     ref = ref_code_store.get("code")
@@ -337,7 +331,7 @@ async def schedule_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     async def send_later(context):
         try:
             airdrop = {"name": project_name, "url": url, "description": "", "reward": "?", "difficulty": "?", "score": "?", "score_reason": ""}
-            text = await gpt_make_post(airdrop, ref)
+            text      = await gpt_make_post(airdrop, ref)
             image_url = await unsplash_image(project_name)
             try:
                 await context.bot.send_photo(chat_id=GROUP_CHAT_ID, photo=image_url, caption=text, parse_mode="HTML")
@@ -345,7 +339,7 @@ async def schedule_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=text, parse_mode="HTML", disable_web_page_preview=False)
             stats_store["sent"] += 1
             stats_store["last"] = datetime.now().strftime("%d.%m.%Y %H:%M")
-            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"✅ Zamanlı gönderi yapıldı: *{project_name}*", parse_mode="Markdown")
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"✅ Zamanlı gönderi: *{project_name}*", parse_mode="Markdown")
         except Exception as e:
             await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"❌ Zamanlı gönderi hatası: {e}")
 
@@ -353,11 +347,10 @@ async def schedule_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"⏰ *{project_name}* {minutes} dakika sonra gönderilecek!", parse_mode="Markdown")
 
 
-# ── Callback ───────────────────────────────────────────
 async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data
+    data  = query.data
 
     if data.startswith("prepare|"):
         idx = int(data.split("|")[1])
@@ -376,7 +369,7 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("send|"):
-        key = data.split("|")[1]
+        key  = data.split("|")[1]
         post = pending_posts.get(key)
         if not post:
             await query.edit_message_text("❌ Post bulunamadı, tekrar dene."); return
@@ -394,7 +387,7 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("rewrite|"):
-        key = data.split("|")[1]
+        key  = data.split("|")[1]
         post = pending_posts.get(key)
         if not post:
             await query.edit_message_text("❌ Post bulunamadı."); return
@@ -419,41 +412,40 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("cancel|"):
-        key = data.split("|")[1]
-        pending_posts.pop(key, None)
+        pending_posts.pop(data.split("|")[1], None)
         await query.edit_message_text("❌ İptal edildi.")
         return
 
 
 # ── Diğer komutlar ─────────────────────────────────────
-async def set_ref_code(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def set_ref_code(update, ctx):
     if not is_admin(update): return
     if not ctx.args: await update.message.reply_text("Kullanım: /setref <kod>"); return
     ref_code_store["code"] = ctx.args[0]
     await update.message.reply_text(f"✅ Ref kodu: `{ctx.args[0]}`", parse_mode="Markdown")
 
-async def clear_ref(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def clear_ref(update, ctx):
     if not is_admin(update): return
     ref_code_store["code"] = None
     await update.message.reply_text("🗑️ Referans kodu temizlendi.")
 
-async def show_ref(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def show_ref(update, ctx):
     if not is_admin(update): return
     await update.message.reply_text(f"🔗 Aktif ref: `{ref_code_store.get('code') or 'Yok'}`", parse_mode="Markdown")
 
-async def broadcast(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def broadcast(update, ctx):
     if not is_admin(update): return
     if not ctx.args: await update.message.reply_text("Kullanım: /broadcast <mesaj>"); return
     await ctx.bot.send_message(chat_id=GROUP_CHAT_ID, text=" ".join(ctx.args))
     await update.message.reply_text("✅ Gönderildi.")
 
-async def boldcast(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def boldcast(update, ctx):
     if not is_admin(update): return
     if not ctx.args: await update.message.reply_text("Kullanım: /boldcast <mesaj>"); return
     await ctx.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"📢 <b>{' '.join(ctx.args)}</b>\n\n— @kriptodropptr", parse_mode="HTML")
     await update.message.reply_text("✅ Kalın duyuru gönderildi.")
 
-async def pin_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def pin_message(update, ctx):
     if not is_admin(update): return
     if not ctx.args: await update.message.reply_text("Kullanım: /pin <mesaj>"); return
     sent = await ctx.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"📌 <b>{' '.join(ctx.args)}</b>\n\n📢 @kriptodropptr", parse_mode="HTML")
@@ -463,39 +455,39 @@ async def pin_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ Gönderdim ama sabitlemedim: {e}")
 
-async def translate(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def translate(update, ctx):
     if not is_admin(update): return
     if not ctx.args: await update.message.reply_text("Kullanım: /translate <metin>"); return
     result = await gpt_text(f"Türkçeye çevir ve özetle:\n\n{' '.join(ctx.args)}", max_tokens=300)
     await update.message.reply_text(f"🇹🇷 *Çeviri:*\n\n{result}", parse_mode="Markdown")
 
-async def hashtag(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def hashtag(update, ctx):
     if not is_admin(update): return
     if not ctx.args: await update.message.reply_text("Kullanım: /hashtag <proje>"); return
     result = await gpt_text(f"{' '.join(ctx.args)} kripto projesi için 10 hashtag üret.", max_tokens=150)
     await update.message.reply_text(f"#️⃣ *Hashtagler:*\n\n{result}", parse_mode="Markdown")
 
-async def stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def stats(update, ctx):
     if not is_admin(update): return
     await update.message.reply_text(
         f"📈 *İstatistikler*\n\n📤 Toplam: `{stats_store['sent']}`\n🕐 Son: `{stats_store['last'] or '—'}`\n🔗 Ref: `{ref_code_store.get('code') or 'Yok'}`",
         parse_mode="Markdown"
     )
 
-async def status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def status(update, ctx):
     if not is_admin(update): return
-    unsplash_status = "✅ Aktif" if UNSPLASH_ACCESS_KEY else "⚠️ Key yok (varsayılan görsel)"
     await update.message.reply_text(
-        f"🟢 *Bot Aktif*\n\n🤖 Model: GPT-4o-mini\n🖼️ Görsel: Unsplash {unsplash_status}\n"
+        f"🟢 *Bot Aktif*\n\n🤖 Model: Llama 3.3 70B (Groq - Ücretsiz)\n"
+        f"🖼️ Görsel: {'Unsplash ✅' if UNSPLASH_ACCESS_KEY else 'Varsayılan'}\n"
         f"📡 Grup: `{GROUP_CHAT_ID}`\n👤 Admin: `{ADMIN_CHAT_ID}`\n🔗 Ref: `{ref_code_store.get('code') or 'Yok'}`",
         parse_mode="Markdown"
     )
 
-async def help_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def help_command(update, ctx):
     if not is_admin(update): return
     await update.message.reply_text(
         "💡 *Hızlı Başlangıç:*\n\n"
-        "1️⃣ /scan → AI 5 airdrop bulsun, seç\n"
+        "1️⃣ /scan → AI 5 airdrop bulsun\n"
         "2️⃣ /autopick → AI en iyisini seçsin\n"
         "3️⃣ Önizlemeyi onayla → Gruba gider\n\n"
         "Tüm komutlar: /start",
@@ -510,9 +502,12 @@ def main():
     if not BOT_TOKEN:
         logger.error("❌ BOT_TOKEN bulunamadı!")
         sys.exit(1)
+    if not GROQ_API_KEY:
+        logger.error("❌ GROQ_API_KEY bulunamadı!")
+        sys.exit(1)
+
     logger.info(f"✅ ADMIN_CHAT_ID: {ADMIN_CHAT_ID}")
-    logger.info(f"✅ GROUP_CHAT_ID: {GROUP_CHAT_ID}")
-    logger.info(f"✅ Unsplash: {'Aktif' if UNSPLASH_ACCESS_KEY else 'Varsayılan görsel'}")
+    logger.info(f"✅ Groq AI aktif")
 
     app = Application.builder().token(BOT_TOKEN).build()
 
