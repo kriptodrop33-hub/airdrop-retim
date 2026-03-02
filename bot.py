@@ -20,7 +20,8 @@ from telegram.ext import (Application, CommandHandler, CallbackQueryHandler,
 
 ref_code_store = {"code": None}
 stats_store    = {"sent": 0, "last": None}
-pending_posts  = {}
+pending_posts  = {}   # önizleme bekleyenler
+sent_posts     = {}   # gruba gönderilmiş postlar {key: {msg_id, text, image_url, name, airdrop}}
 shown_names    = set()
 
 
@@ -439,7 +440,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "━━━━━━━━━━━━━━━━━━━━━\n📣 <b>ARAÇLAR</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
             "/broadcast · /boldcast · /pin\n"
             "/translate · /hashtag\n"
-            "/stats · /status"
+            "/stats · /status\n\n""━━━━━━━━━━━━━━━━━━━━━\n🔬 <b>ARAŞTIR &amp; DÜZENLE</b>\n━━━━━━━━━━━━━━━━━━━━━\n""/research &lt;link veya başlık&gt; — Araştır, post hazırla\n""/posts — Gönderilen postları listele ve düzenle"
         )
     await update.message.reply_text(msg, parse_mode="HTML")
 
@@ -687,9 +688,21 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     parse_mode="HTML", disable_web_page_preview=False)
             stats_store["sent"] += 1
             stats_store["last"] = datetime.now().strftime("%d.%m.%Y %H:%M")
+            # Gönderilen postu kaydet (düzenleme için)
+            sent_key = str(stats_store["sent"])
+            sent_posts[sent_key] = {
+                "name": post["name"],
+                "text": post["text"],
+                "image_url": post.get("image_url"),
+                "airdrop": post.get("airdrop", {}),
+                "ref": post.get("ref"),
+                "sent_at": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            }
             pending_posts.pop(key, None)
             await q.edit_message_text(
-                f"✅ <b>{post['name']}</b> gruba gönderildi!", parse_mode="HTML")
+                f"✅ <b>{post['name']}</b> gruba gönderildi!\n\n"
+                f"📝 Düzenlemek için: /posts",
+                parse_mode="HTML")
         except Exception as e:
             await q.edit_message_text(f"❌ Gönderilemedi: {e}")
         return
@@ -741,16 +754,180 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("❌ İptal edildi.")
         return
 
+    # ── Gönderilmiş post düzenle
+    if data.startswith("editpost|"):
+        key  = data.split("|")[1]
+        post = sent_posts.get(key)
+        if not post:
+            await q.edit_message_text("❌ Post bulunamadı."); return
+        await q.edit_message_reply_markup(None)
+        # Önizleme gönder + düzenleme butonları
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ Yazıyı Değiştir",  callback_data=f"edittext|{key}"),
+             InlineKeyboardButton("🔗 Linki Değiştir",   callback_data=f"editsentlink|{key}")],
+            [InlineKeyboardButton("🔄 Yeniden Yaz (AI)", callback_data=f"rewritesent|{key}"),
+             InlineKeyboardButton("🗑️ Kapat",             callback_data=f"closedit|{key}")]
+        ])
+        preview = post["text"][:600] + ("..." if len(post["text"]) > 600 else "")
+        await ctx.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=f"✏️ <b>{post['name']}</b> düzenleniyor\n"
+                 f"📅 Gönderildi: {post['sent_at']}\n\n"
+                 f"<i>Mevcut post önizlemesi:</i>\n\n{preview}",
+            parse_mode="HTML", reply_markup=kb)
+        return
+
+    if data.startswith("edittext|"):
+        key = data.split("|")[1]
+        ctx.user_data["edit_sent_key"]  = key
+        ctx.user_data["edit_sent_mode"] = "text"
+        ctx.user_data["await_link"]     = None
+        await q.edit_message_reply_markup(None)
+        await ctx.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text="✏️ <b>Yeni yazıyı gönder:</b>\n\n"
+                 "<i>Tüm postu yeniden yazabilirsin. HTML kullanabilirsin.\n"
+                 "İptal için: /posts</i>",
+            parse_mode="HTML")
+        return
+
+    if data.startswith("editsentlink|"):
+        key = data.split("|")[1]
+        ctx.user_data["edit_sent_key"]  = key
+        ctx.user_data["edit_sent_mode"] = "link"
+        ctx.user_data["await_link"]     = None
+        await q.edit_message_reply_markup(None)
+        await ctx.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text="🔗 <b>Yeni linki gönder:</b>\n<i>(http ile başlayan URL)</i>",
+            parse_mode="HTML")
+        return
+
+    if data.startswith("rewritesent|"):
+        key  = data.split("|")[1]
+        post = sent_posts.get(key)
+        if not post:
+            await q.edit_message_text("❌ Post bulunamadı."); return
+        await q.edit_message_text("✍️ AI yeniden yazıyor...")
+        new = await llm(
+            f"Bu Telegram kripto airdrop postunu daha çarpıcı ve güncel yeniden yaz.\n"
+            f"HTML formatını ve yapıyı koru. URL ekleme:\n\n{post['text']}", 900)
+        new = re.sub(r'https?://\S+', '', new).strip()
+        sent_posts[key]["text"] = new
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ Yazıyı Değiştir",  callback_data=f"edittext|{key}"),
+             InlineKeyboardButton("🔗 Linki Değiştir",   callback_data=f"editsentlink|{key}")],
+            [InlineKeyboardButton("🔄 Yeniden Yaz (AI)", callback_data=f"rewritesent|{key}"),
+             InlineKeyboardButton("🗑️ Kapat",             callback_data=f"closedit|{key}")]
+        ])
+        try:
+            if post.get("image_url"):
+                await ctx.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=post["image_url"],
+                                         caption=new[:1024], parse_mode="HTML", reply_markup=kb)
+            else:
+                await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=new,
+                                           parse_mode="HTML", reply_markup=kb,
+                                           disable_web_page_preview=False)
+        except Exception:
+            await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=new,
+                                       parse_mode="HTML", reply_markup=kb,
+                                       disable_web_page_preview=False)
+        return
+
+    if data.startswith("closedit|"):
+        await q.edit_message_text("✅ Düzenleme kapatıldı.")
+        return
+
+    if data.startswith("sentupdated|"):
+        key  = data.split("|")[1]
+        post = sent_posts.get(key)
+        if not post:
+            await q.edit_message_text("❌ Post bulunamadı."); return
+        try:
+            if post.get("image_url"):
+                try:
+                    await ctx.bot.send_photo(
+                        chat_id=GROUP_CHAT_ID, photo=post["image_url"],
+                        caption=post["text"], parse_mode="HTML")
+                except Exception:
+                    await ctx.bot.send_message(
+                        chat_id=GROUP_CHAT_ID, text=post["text"],
+                        parse_mode="HTML", disable_web_page_preview=False)
+            else:
+                await ctx.bot.send_message(
+                    chat_id=GROUP_CHAT_ID, text=post["text"],
+                    parse_mode="HTML", disable_web_page_preview=False)
+            await q.edit_message_text(
+                f"✅ <b>{post['name']}</b> güncellenerek gruba tekrar gönderildi!",
+                parse_mode="HTML")
+        except Exception as e:
+            await q.edit_message_text(f"❌ Gönderilemedi: {e}")
+        return
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # MESAJ HANDLER
 # ════════════════════════════════════════════════════════════════════════════
 async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID: return
+
+    text = update.message.text.strip()
+
+    # Gönderilmiş post metin düzenleme
+    edit_key  = ctx.user_data.get("edit_sent_key")
+    edit_mode = ctx.user_data.get("edit_sent_mode")
+    if edit_key and edit_mode == "text":
+        ctx.user_data["edit_sent_key"]  = None
+        ctx.user_data["edit_sent_mode"] = None
+        post = sent_posts.get(edit_key)
+        if not post:
+            await update.message.reply_text("❌ Post bulunamadı."); return
+        sent_posts[edit_key]["text"] = text
+        # Yeni yazıyla preview + gruba tekrar gönder butonu
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("📤 Gruba Güncellemeyi Gönder",
+                                 callback_data=f"sentupdated|{edit_key}"),
+            InlineKeyboardButton("✏️ Tekrar Düzenle",
+                                 callback_data=f"edittext|{edit_key}")
+        ]])
+        await update.message.reply_text(
+            f"✅ Yazı güncellendi!\n\n<b>Önizleme:</b>\n\n{text[:800]}",
+            parse_mode="HTML", reply_markup=kb)
+        return
+
+    # Gönderilmiş post link düzenleme
+    if edit_key and edit_mode == "link":
+        ctx.user_data["edit_sent_key"]  = None
+        ctx.user_data["edit_sent_mode"] = None
+        if not text.startswith("http"):
+            await update.message.reply_text("⚠️ http ile başlayan geçerli bir link gönder."); return
+        post = sent_posts.get(edit_key)
+        if not post:
+            await update.message.reply_text("❌ Post bulunamadı."); return
+        # Yazıdaki eski linki yenisiyle değiştir
+        old_text = post["text"]
+        new_text = re.sub(r'href=["\']https?://[^"\']+["\']>👉 HEMEN KATIL',
+                          f'href=\"{text}\">👉 HEMEN KATIL', old_text)
+        if new_text == old_text:
+            # href bulunamazsa sona ekle
+            new_text = re.sub(r'🔗 <b>\[ LİNK BURAYA \]</b>', f'🔗 <b><a href=\"{text}\">👉 HEMEN KATIL</a></b>', old_text)
+        sent_posts[edit_key]["text"]      = new_text
+        sent_posts[edit_key]["image_url"] = await og_image(text)
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("📤 Gruba Güncellemeyi Gönder",
+                                 callback_data=f"sentupdated|{edit_key}"),
+            InlineKeyboardButton("🔗 Linki Tekrar Değiştir",
+                                 callback_data=f"editsentlink|{edit_key}")
+        ]])
+        await update.message.reply_text(
+            f"✅ Link güncellendi: <code>{text}</code>\n\n"
+            "Yeni post gruba gönderilebilir.",
+            parse_mode="HTML", reply_markup=kb)
+        return
+
     await_link = ctx.user_data.get("await_link")
     if not await_link: return
 
-    text = update.message.text.strip()
     if not text.startswith("http"):
         await update.message.reply_text("⚠️ http ile başlayan geçerli bir link gönder."); return
 
@@ -880,6 +1057,136 @@ async def help_cmd(u, c):
         "/start — Tüm komutlar", parse_mode="HTML")
 
 
+
+# ════════════════════════════════════════════════════════════════════════════
+# /research — link veya başlık ver, araştır, post hazırla
+# ════════════════════════════════════════════════════════════════════════════
+async def research(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update): return
+    if not ctx.args:
+        await update.message.reply_text(
+            "Kullanım:\n"
+            "/research &lt;link&gt; — URL araştır, post hazırla\n"
+            "/research &lt;proje adı&gt; — İsimle araştır, post hazırla\n\n"
+            "Örnek:\n"
+            "<code>/research https://app.galxe.com/quest/xyz</code>\n"
+            "<code>/research Hyperlane airdrop</code>",
+            parse_mode="HTML"); return
+
+    query = " ".join(ctx.args)
+    is_url = query.startswith("http")
+
+    sm = await update.message.reply_text(
+        f"🔍 <b>Araştırılıyor:</b> <code>{query[:60]}</code>\n\n"
+        "📡 Web'den bilgi toplanıyor...",
+        parse_mode="HTML")
+
+    try:
+        # Web araması yap
+        search_q = query if is_url else f"{query} crypto airdrop 2025 how to join reward"
+        results  = await web_search(search_q, n=6)
+
+        # URL'yse link kontrolü de yap
+        link_status = ""
+        if is_url:
+            ok, code = await check_url(query)
+            link_status = f"Link Durumu: {'✅ Aktif' if ok else '❌ Çalışmıyor'} (HTTP {code})\n"
+
+        # Sonuçlardan içerik derle
+        ctx_text = ""
+        for r in results:
+            ctx_text += f"URL: {r.get('url','')}\nBaşlık: {r.get('title','')}\nİçerik: {r.get('content','')[:400]}\n---\n"
+
+        await sm.edit_text(
+            f"🔍 <b>Araştırılıyor:</b> <code>{query[:60]}</code>\n\n"
+            "🤖 AI analiz ediyor...", parse_mode="HTML")
+
+        # GPT ile airdrop bilgisi çıkar
+        extract_prompt = f"""Web araması yapıldı. Bu airdrop hakkında bilgileri çıkar.
+
+Aranan: {query}
+{link_status}
+Web Sonuçları:
+{ctx_text[:4000]}
+
+Aşağıdaki bilgileri çıkar. Bilgi yoksa "Belirtilmemiş" yaz, UYDURMA.
+SADECE JSON döndür:
+{{
+  "coin_name": "Token/Coin adı",
+  "coin_symbol": "SEMBOL",
+  "host_platform": "Nerede yapılıyor",
+  "campaign_url": "{query if is_url else ''}",
+  "description": "Proje ne yapıyor ve neden airdrop yapıyor (Türkçe, 2 cümle)",
+  "how_to_join": "Katılım adımları (Türkçe, numaralı)",
+  "reward": "Ne kadar token/coin dağıtılıyor",
+  "referral": true,
+  "referral_bonus": "Referans bonusu (varsa)",
+  "start_date": "GG.AA.YYYY veya Belirtilmemiş",
+  "end_date": "GG.AA.YYYY veya Belirtilmemiş",
+  "score": 7,
+  "score_reason": "Neden bu puan"
+}}"""
+
+        raw = await llm(extract_prompt, tokens=1200)
+        raw = raw.strip()
+        if "```" in raw:
+            for part in raw.split("```"):
+                part = part.strip().lstrip("json").strip()
+                if part.startswith("{"):
+                    raw = part
+                    break
+        if not raw.startswith("{"):
+            s, e = raw.find("{"), raw.rfind("}") + 1
+            if s != -1: raw = raw[s:e]
+
+        airdrop = json.loads(raw)
+        airdrop["url"] = query if is_url else (results[0].get("url","") if results else "")
+
+        # Özet bilgi göster
+        coin = airdrop.get("coin_name","?")
+        sym  = f" ({airdrop.get('coin_symbol','')})" if airdrop.get("coin_symbol") else ""
+        info = (
+            f"✅ <b>Bulundu: {coin}{sym}</b>\n"
+            f"🏢 Platform: {airdrop.get('host_platform','?')}\n"
+            f"💰 Ödül: {airdrop.get('reward','?')}\n"
+            f"📅 Bitiş: {airdrop.get('end_date','?')}\n"
+            f"⭐ Puan: {airdrop.get('score','?')}/10\n\n"
+            "Post hazırlanıyor..."
+        )
+        await sm.edit_text(info, parse_mode="HTML")
+
+        await show_preview(update, ctx, airdrop,
+                           custom_link=airdrop.get("campaign_url") or airdrop.get("url",""))
+
+    except Exception as e:
+        logger.exception(e)
+        await sm.edit_text(f"❌ Araştırma hatası: {e}")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# /posts — gönderilen postları listele ve düzenle
+# ════════════════════════════════════════════════════════════════════════════
+async def posts_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update): return
+    if not sent_posts:
+        await update.message.reply_text(
+            "📭 Henüz gönderilmiş post yok.\n\nGönder: /scan → post hazırla → ✅ Gruba Gönder")
+        return
+
+    msg = "📋 <b>Gönderilen Postlar:</b>\n\n"
+    buttons = []
+    # Son 10 postu göster (en yeniden eskiye)
+    for key in sorted(sent_posts.keys(), reverse=True)[:10]:
+        p = sent_posts[key]
+        msg += f"<b>{key}.</b> {p['name']} — <i>{p['sent_at']}</i>\n"
+        buttons.append([InlineKeyboardButton(
+            f"✏️ #{key} — {p['name'][:25]}",
+            callback_data=f"editpost|{key}"
+        )])
+
+    await update.message.reply_text(msg, parse_mode="HTML",
+                                    reply_markup=InlineKeyboardMarkup(buttons))
+
 # ════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ════════════════════════════════════════════════════════════════════════════
@@ -898,6 +1205,7 @@ def main():
         ("broadcast", broadcast), ("boldcast", boldcast), ("pin", pin_msg),
         ("translate", translate), ("hashtag", hashtag),
         ("stats", stats), ("status", status),
+        ("research", research), ("posts", posts_list),
     ]:
         app.add_handler(CommandHandler(cmd, fn))
     app.add_handler(CallbackQueryHandler(on_callback))
