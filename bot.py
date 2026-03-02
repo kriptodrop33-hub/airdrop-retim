@@ -1,989 +1,910 @@
-import logging
-import sys
-import os
-import json
-import re
-import random
-import time
-import hashlib
-import httpx
+import logging, sys, os, json, re, random, time, asyncio, httpx
 from datetime import datetime
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-    stream=sys.stdout
-)
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s",
+                    level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 load_dotenv()
 
-BOT_TOKEN           = os.getenv("BOT_TOKEN", "")
-GROQ_API_KEY        = os.getenv("GROQ_API_KEY", "")
-TAVILY_API_KEY      = os.getenv("TAVILY_API_KEY", "")
-ADMIN_CHAT_ID       = int(os.getenv("ADMIN_CHAT_ID", "0"))
-GROUP_CHAT_ID       = int(os.getenv("GROUP_CHAT_ID", "0"))
-UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY", "")
+BOT_TOKEN      = os.getenv("BOT_TOKEN", "")
+GROQ_API_KEY   = os.getenv("GROQ_API_KEY", "")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+ADMIN_CHAT_ID  = int(os.getenv("ADMIN_CHAT_ID", "0"))
+GROUP_CHAT_ID  = int(os.getenv("GROUP_CHAT_ID", "0"))
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler,
-    MessageHandler, filters, ContextTypes
-)
+from telegram.ext import (Application, CommandHandler, CallbackQueryHandler,
+                           MessageHandler, filters, ContextTypes)
 
-# ── State ──────────────────────────────────────────────
-ref_code_store  = {"code": None}
-stats_store     = {"sent": 0, "last": None}
-pending_posts   = {}
-shown_airdrops  = set()
+ref_code_store = {"code": None}
+stats_store    = {"sent": 0, "last": None}
+pending_posts  = {}
+shown_names    = set()
 
 
-# ══════════════════════════════════════════════════════
-# GROQ  (ücretsiz LLM)
-# ══════════════════════════════════════════════════════
-
-async def gpt_text(prompt: str, max_tokens: int = 1000) -> str:
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
+# ════════════════════════════════════════════════════════════════════════════
+# GROQ
+# ════════════════════════════════════════════════════════════════════════════
+async def llm(prompt: str, tokens: int = 1500) -> str:
+    async with httpx.AsyncClient(timeout=90) as c:
+        r = await c.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens,
-                "temperature": 0.85
-            }
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}",
+                     "Content-Type": "application/json"},
+            json={"model": "llama-3.3-70b-versatile",
+                  "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": tokens, "temperature": 0.6}
         )
-        data = resp.json()
-        if "error" in data:
-            raise Exception(data["error"]["message"])
-        return data["choices"][0]["message"]["content"].strip()
+        d = r.json()
+        if "error" in d:
+            raise Exception(d["error"]["message"])
+        return d["choices"][0]["message"]["content"].strip()
 
 
-# ══════════════════════════════════════════════════════
-# TAVILY WEB SEARCH (ücretsiz, 1000 istek/ay)
-# ══════════════════════════════════════════════════════
-
-async def tavily_search(query: str, max_results: int = 5) -> list[dict]:
-    """Tavily API ile web araması yap"""
+# ════════════════════════════════════════════════════════════════════════════
+# TAVILY
+# ════════════════════════════════════════════════════════════════════════════
+async def web_search(query: str, n: int = 6) -> list[dict]:
     if not TAVILY_API_KEY:
-        logger.warning("TAVILY_API_KEY yok, web araması atlanıyor")
         return []
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.post(
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(
                 "https://api.tavily.com/search",
-                json={
-                    "api_key": TAVILY_API_KEY,
-                    "query": query,
-                    "search_depth": "advanced",
-                    "max_results": max_results,
-                    "include_answer": True,
-                    "include_raw_content": False,
-                }
+                json={"api_key": TAVILY_API_KEY, "query": query,
+                      "search_depth": "advanced", "max_results": n,
+                      "include_answer": False,
+                      "include_raw_content": False}
             )
-            data = resp.json()
-            return data.get("results", [])
+            return r.json().get("results", [])
     except Exception as e:
-        logger.warning(f"Tavily arama hatası: {e}")
+        logger.warning(f"Tavily: {e}")
         return []
 
 
-# ══════════════════════════════════════════════════════
-# OPEN GRAPH — link önizleme görseli
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# LİNK KONTROL — çalışıyor mu?
+# ════════════════════════════════════════════════════════════════════════════
+async def check_url(url: str) -> tuple[bool, int]:
+    """(çalışıyor_mu, status_code)"""
+    if not url or not url.startswith("http"):
+        return False, 0
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0"}) as c:
+            r = await c.head(url)
+            ok = r.status_code < 400
+            return ok, r.status_code
+    except Exception:
+        try:
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True,
+                    headers={"User-Agent": "Mozilla/5.0"}) as c:
+                r = await c.get(url)
+                ok = r.status_code < 400
+                return ok, r.status_code
+        except Exception:
+            return False, 0
 
-async def get_og_image(url: str) -> str | None:
-    """URL'den Open Graph görselini çek"""
+
+# ════════════════════════════════════════════════════════════════════════════
+# OG IMAGE
+# ════════════════════════════════════════════════════════════════════════════
+async def og_image(url: str) -> str | None:
     if not url or not url.startswith("http"):
         return None
     try:
-        async with httpx.AsyncClient(
-            timeout=10,
-            follow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; TelegramBot/1.0)"}
-        ) as client:
-            resp = await client.get(url)
-            html = resp.text
-
-            # og:image meta tagını bul
-            patterns = [
-                r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\'](https?://[^"\']+)["\']',
-                r'<meta[^>]+content=["\'](https?://[^"\']+)["\'][^>]+property=["\']og:image["\']',
-                r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\'](https?://[^"\']+)["\']',
-            ]
-            for pattern in patterns:
-                match = re.search(pattern, html, re.IGNORECASE)
-                if match:
-                    img_url = match.group(1)
-                    logger.info(f"OG image bulundu: {img_url[:80]}")
-                    return img_url
+        async with httpx.AsyncClient(timeout=12, follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 TelegramBot"}) as c:
+            r = await c.get(url)
+            for pat in [
+                r'property=["\']og:image["\'][^>]+content=["\'](https?://[^"\']+)["\']',
+                r'content=["\'](https?://[^"\']+)["\'][^>]+property=["\']og:image["\']',
+                r'name=["\']twitter:image["\'][^>]+content=["\'](https?://[^"\']+)["\']',
+            ]:
+                m = re.search(pat, r.text, re.I)
+                if m:
+                    return m.group(1)
     except Exception as e:
-        logger.warning(f"OG image çekme hatası ({url[:50]}): {e}")
+        logger.warning(f"OG image: {e}")
     return None
 
 
-# ══════════════════════════════════════════════════════
-# AIRDROP TARAMA — Tavily + CoinGecko + GPT analiz
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# PLATFORM TARAMA — çok geniş kaynak listesi
+# ════════════════════════════════════════════════════════════════════════════
 
-async def search_live_airdrops() -> str:
-    """Tavily ile güncel airdrop haberlerini tara"""
-    queries = [
-        "active crypto airdrop 2025 claim now referral",
-        "new crypto airdrop campaign testnet rewards 2025",
-        "defi airdrop eligible tasks galxe zealy 2025",
-    ]
-    # Her çağrıda farklı sorgu
-    query = random.choice(queries)
-    results = await tavily_search(query, max_results=6)
+SEARCH_QUERIES = [
+    # Büyük borsalar — kampanya değil coin odaklı
+    "Binance Launchpool new token airdrop staking 2025 live",
+    "OKX Jumpstart new coin campaign airdrop claim 2025",
+    "Bybit Launchpad new token distribution event 2025",
+    "KuCoin Spotlight new token airdrop event 2025",
+    "Gate.io Startup new token airdrop live 2025",
+    "MEXC new token airdrop kickstarter 2025",
+    "Bitget new listing airdrop campaign 2025",
+    "HTX Huobi new token airdrop distribution 2025",
 
-    if not results:
-        return ""
+    # Görev platformları
+    "Galxe active campaign airdrop quest reward 2025",
+    "Zealy sprint airdrop new crypto project 2025",
+    "Layer3 quest airdrop active reward 2025",
+    "Intract quest campaign airdrop 2025",
+    "Crew3 airdrop task campaign 2025",
 
-    summary = "Web'den bulunan güncel airdrop haberleri:\n"
-    for r in results:
-        summary += f"- {r.get('title','')}: {r.get('url','')}\n  {r.get('content','')[:200]}\n"
-    return summary
+    # Zincir / ekosistem airdropları
+    "new Layer2 testnet airdrop eligible 2025 active",
+    "Arbitrum ecosystem airdrop new project 2025",
+    "Base ecosystem new token airdrop 2025",
+    "Solana new project airdrop campaign 2025",
+    "zkSync era new airdrop project 2025",
+    "Starknet ecosystem airdrop 2025 new",
+    "Sui Move ecosystem airdrop 2025",
+    "Aptos ecosystem new airdrop 2025",
+
+    # DeFi / protokol
+    "new DeFi protocol airdrop early user reward 2025",
+    "restaking liquid staking new token airdrop 2025",
+    "DEX new token airdrop referral bonus 2025",
+    "bridge cross-chain new airdrop 2025 live",
+
+    # Takip siteleri
+    "airdrops.io new confirmed airdrop 2025",
+    "airdropalert.com active airdrop 2025",
+    "earnifi airdrop eligible wallet 2025",
+    "coinmarketcap airdrop new live 2025",
+    "coingecko airdrop event active 2025",
+
+    # Genel güncel
+    "crypto airdrop claim now referral system 2025 new",
+    "best crypto airdrop this week 2025 active",
+    "crypto airdrop free token today 2025",
+]
 
 
-async def fetch_coingecko_trending() -> str:
-    """CoinGecko trending coinleri çek"""
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.get(
-                "https://api.coingecko.com/api/v3/search/trending",
-                headers={"accept": "application/json"}
-            )
-            if r.status_code == 200:
-                coins = r.json().get("coins", [])[:8]
-                summary = "CoinGecko'da trend olan projeler:\n"
-                for c in coins:
-                    item = c.get("item", {})
-                    summary += f"- {item.get('name')} ({item.get('symbol')}) rank:{item.get('market_cap_rank','?')}\n"
-                return summary
-    except Exception as e:
-        logger.warning(f"CoinGecko hatası: {e}")
-    return ""
+async def run_platform_scans() -> list[dict]:
+    """Rastgele seçilmiş sorgularla web tara"""
+    # Her taramada 8 farklı sorgu seç
+    selected = random.sample(SEARCH_QUERIES, min(8, len(SEARCH_QUERIES)))
+    tasks    = [web_search(q, n=4) for q in selected]
+    results  = await asyncio.gather(*tasks, return_exceptions=True)
+
+    raw = []
+    for res in results:
+        if isinstance(res, Exception):
+            continue
+        for r in res:
+            raw.append({
+                "title":   r.get("title", ""),
+                "url":     r.get("url", ""),
+                "snippet": r.get("content", "")[:500],
+            })
+    return raw
 
 
-async def gpt_find_airdrops() -> list[dict]:
-    """Web araması + CoinGecko verisiyle GPT'den airdrop listesi al"""
+async def extract_airdrops(raw: list[dict], exclude: set) -> list[dict]:
+    if not raw:
+        return []
 
-    # Paralel veri çek
-    import asyncio
-    web_data, trending_data = await asyncio.gather(
-        search_live_airdrops(),
-        fetch_coingecko_trending(),
-        return_exceptions=True
-    )
-    if isinstance(web_data, Exception):
-        web_data = ""
-    if isinstance(trending_data, Exception):
-        trending_data = ""
+    # Context oluştur
+    ctx_text = ""
+    seen_urls = set()
+    for item in raw:
+        u = item["url"]
+        if u in seen_urls:
+            continue
+        seen_urls.add(u)
+        ctx_text += f"\nKaynak URL: {u}\nBaşlık: {item['title']}\nİçerik: {item['snippet']}\n{'─'*40}"
 
-    # Daha önce gösterilenleri GPT'ye söyle
-    exclude = ", ".join(list(shown_airdrops)[-10:]) if shown_airdrops else "yok"
+    excl = ", ".join(list(exclude)[-20:]) if exclude else "yok"
 
-    # Konu çeşitlendirmesi
-    topics = [
-        "Layer2 rollup ve ZK projeleri",
-        "DEX, AMM ve DeFi protokolleri",
-        "CEX borsası trading ödülleri",
-        "Cross-chain bridge projeleri",
-        "Web3 cüzdan ve altyapı",
-        "Restaking ve liquid staking",
-        "AI + kripto projeleri",
-        "Galxe/Zealy üzerindeki aktif kampanyalar",
-        "Solana/Sui/Aptos ekosistemi",
-        "NFT ve GameFi projeleri",
-    ]
-    random.seed(int(time.time() / 7200))
-    focus = random.sample(topics, 2)
+    prompt = f"""Sen kripto airdrop araştırmacısısın. Aşağıdaki web arama sonuçlarını analiz et.
 
-    prompt = f"""Sen 2025 kripto airdrop uzmanısın. Aşağıdaki GÜNCEL web verilerini kullanarak 5 adet aktif airdrop listele.
+WEB SONUÇLARI:
+{ctx_text[:6000]}
 
-{web_data}
+BUNLARI EKLEME (zaten gösterildi): {excl}
 
-{trending_data}
+GÖREV:
+Bu sonuçlardan GERÇEK ve AKTİF kripto airdroplarını çıkar.
 
-ODAK KONULAR: {', '.join(focus)}
-DAHA ÖNCE GÖSTERİLENLER (bunları TEKRARLAMA): {exclude}
+ÖNEMLİ KURALLAR:
+1. COIN/TOKEN adını yaz, platform adını değil
+   ❌ YANLIŞ: "OKX Jumpstart Airdrobu"
+   ✅ DOĞRU: "XYZ Token Airdrobu (OKX Jumpstart'ta)"
+   ❌ YANLIŞ: "Binance Launchpool Airdrobu"  
+   ✅ DOĞRU: "ABC Coin Airdrobu (Binance Launchpool)"
 
-ZORUNLU KURALLAR:
-1. Sadece GERÇEK ve VAR OLAN projeleri yaz
-2. URL'ler çalışan resmi siteler olmalı
-3. Yukarıdaki web verilerindeki projeleri öncelikle kullan
-4. Özellikle AKTİF REFERANS SİSTEMİ olan airdroplar
-5. Türkiye'den katılılabilen
+2. Kampanya hâlâ devam ediyor mu? Tarih geçmişse EKLEME
+3. URL'ler gerçek ve erişilebilir olmalı
+4. Bilgi yoksa "Belirtilmemiş" yaz, UYDURMA
+5. Dağıtılan coin/token miktarını yaz (varsa)
+6. Referans/davet sistemi olanları işaretle
 
-SADECE JSON döndür, açıklama ekleme:
+SADECE JSON döndür (başka hiçbir şey yazma):
 [
   {{
-    "name": "Proje Adı",
-    "category": "DEX/CEX/L2/Bridge/DeFi/GameFi",
-    "url": "https://resmi-site.com",
-    "campaign_url": "https://katilim-linki.com",
-    "description": "Ne yapıyor ve neden önemli (Türkçe, 2 cümle)",
-    "how_to_join": "1. Adım\\n2. Adım\\n3. Adım (Türkçe)",
-    "reward": "Tahmini ödül",
+    "coin_name": "Dağıtılan Coin/Token Adı",
+    "coin_symbol": "SEMBOL",
+    "host_platform": "Nerede yapılıyor (Binance/Galxe/Resmi Site/vs)",
+    "url": "https://kaynak-url.com",
+    "campaign_url": "https://direkt-katilim-linki.com",
+    "description": "Bu coin nedir ve neden airdrop yapıyor (Türkçe, 2 cümle)",
+    "how_to_join": "Katılım adımları (Türkçe, kısa)",
+    "reward": "Tam olarak ne kadar coin/token dağıtılıyor",
     "referral": true,
-    "referral_bonus": "Davet bonusu",
-    "difficulty": "Kolay/Orta/Zor",
-    "time_required": "X dakika",
-    "deadline": "Tarih veya Sürekli",
+    "referral_bonus": "Referans bonusu detayı",
+    "start_date": "GG.AA.YYYY veya Belirtilmemiş",
+    "end_date": "GG.AA.YYYY veya Sürekli veya Belirtilmemiş",
+    "status": "Aktif",
     "score": 8,
-    "score_reason": "Kısa neden"
+    "score_reason": "Neden güvenilir/değerli"
   }}
 ]"""
 
-    raw = await gpt_text(prompt, max_tokens=2500)
-    raw = raw.strip()
-    if "```" in raw:
-        for part in raw.split("```"):
+    raw_resp = await llm(prompt, tokens=3000)
+    raw_resp = raw_resp.strip()
+
+    if "```" in raw_resp:
+        for part in raw_resp.split("```"):
             part = part.strip().lstrip("json").strip()
             if part.startswith("["):
-                raw = part
+                raw_resp = part
                 break
-    if not raw.startswith("["):
-        s, e = raw.find("["), raw.rfind("]") + 1
+
+    if not raw_resp.startswith("["):
+        s, e = raw_resp.find("["), raw_resp.rfind("]") + 1
         if s != -1:
-            raw = raw[s:e]
+            raw_resp = raw_resp[s:e]
 
-    airdrops = json.loads(raw)
+    try:
+        items = json.loads(raw_resp)
+    except Exception:
+        return []
 
-    # Filtre: geçersiz URL'leri at
-    valid = [
-        a for a in airdrops
-        if a.get("url", "").startswith("http")
-        and "example.com" not in a.get("url", "")
-    ]
-    return valid if valid else airdrops
+    # coin_name yoksa name'den doldur
+    for item in items:
+        if not item.get("coin_name"):
+            item["coin_name"] = item.get("name", "Bilinmeyen")
+        if not item.get("name"):
+            item["name"] = item["coin_name"]
 
-
-# ══════════════════════════════════════════════════════
-# KAMPANYA GEÇERLİLİK KONTROLÜ
-# ══════════════════════════════════════════════════════
-
-async def verify_campaign(url: str, name: str) -> dict:
-    """Tavily ile kampanyanın gerçek ve aktif olup olmadığını kontrol et"""
-    if not TAVILY_API_KEY:
-        return {"valid": None, "note": "Doğrulama yapılamadı (Tavily key yok)"}
-
-    results = await tavily_search(f"{name} airdrop campaign 2025 active", max_results=3)
-
-    if not results:
-        return {"valid": None, "note": "Arama sonucu bulunamadı"}
-
-    context = "\n".join([f"- {r.get('title','')}: {r.get('content','')[:300]}" for r in results])
-
-    verdict = await gpt_text(
-        f"""Bu kripto airdrop kampanyasını değerlendir:
-Proje: {name}
-URL: {url}
-
-Web'den bulunan bilgiler:
-{context}
-
-Şunları değerlendir:
-- Kampanya hâlâ aktif mi?
-- URL güvenilir mi?
-- Dolandırıcılık riski var mı?
-- Genel güvenilirlik
-
-Kısa ve net yanıt ver (Türkçe, 3-4 cümle). Başına ✅ (güvenilir), ⚠️ (dikkatli ol) veya ❌ (şüpheli) koy.""",
-        max_tokens=200
-    )
-    return {"valid": True, "note": verdict}
+    return items
 
 
-# ══════════════════════════════════════════════════════
+async def verify_links(airdrops: list[dict]) -> list[dict]:
+    """Her airdrop için link kontrolü yap"""
+    verified = []
+    for a in airdrops:
+        url = a.get("campaign_url") or a.get("url", "")
+        if url and url.startswith("http"):
+            ok, code = await check_url(url)
+            a["link_ok"]   = ok
+            a["link_code"] = code
+        else:
+            a["link_ok"]   = None
+            a["link_code"] = 0
+        verified.append(a)
+    return verified
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # POST OLUŞTURMA
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+async def make_post(airdrop: dict, ref: str = None, link: str = None) -> str:
+    coin    = airdrop.get("coin_name") or airdrop.get("name", "")
+    symbol  = airdrop.get("coin_symbol", "")
+    host    = airdrop.get("host_platform", "")
+    sym_txt = f" ({symbol})" if symbol else ""
 
-async def gpt_make_post(airdrop: dict, ref: str = None, custom_link: str = None) -> str:
-    score_line = f"Puan: {airdrop.get('score','?')}/10 — {airdrop.get('score_reason','')}" if airdrop.get('score') not in ('?', None) else ""
+    prompt = f"""Kripto airdrop için profesyonel, bilgilendirici Telegram duyurusu yaz.
 
-    prompt = f"""Türk kripto topluluğu için bu airdrop hakkında emojili, heyecan verici Telegram duyurusu yaz.
-HTML formatı: <b>kalın</b>, <i>italik</i>, <code>kod</code>
-
-Proje: {airdrop['name']} [{airdrop.get('category','')}]
+Coin/Token: {coin}{sym_txt}
+Platform: {host}
 Açıklama: {airdrop.get('description','')}
 Nasıl Katılınır: {airdrop.get('how_to_join','')}
 Ödül: {airdrop.get('reward','?')}
-Zorluk: {airdrop.get('difficulty','?')} • Süre: {airdrop.get('time_required','?')}
-Referans: {'VAR — ' + airdrop.get('referral_bonus','') if airdrop.get('referral') else 'Yok'}
-{score_line}
+Başlangıç: {airdrop.get('start_date','?')}
+Bitiş: {airedrop.get('end_date','?') if False else airdrop.get('end_date','?')}
+Referans: {'VAR — ' + str(airdrop.get('referral_bonus','')) if airdrop.get('referral') else 'Yok'}
+Puan: {airdrop.get('score','?')}/10
 
-Format: 🚀 Başlık → Çarpıcı giriş → 📋 Katılım adımları → 💰 Ödül → ⭐ Puan
-ÖNEMLİ: Post içine hiçbir URL veya http adresi yazma."""
+FORMAT — HTML kullan, Türkçe yaz:
 
-    text = await gpt_text(prompt, max_tokens=700)
+🚀 <b>[COIN ADI] AİRDROP!</b>
+<i>Kısa çarpıcı giriş cümlesi</i>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 <b>NASIL KATILIRSIN?</b>
+1. Adım
+2. Adım
+3. Adım
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>ÖDÜL</b>
+Ödül detayları
+
+📅 <b>TARİH</b>
+Başlangıç → Bitiş
+
+⭐ <b>DEĞERLENDIRME</b>
+Puan ve kısa yorum
+
+#hashtag1 #hashtag2 #hashtag3
+
+NOT: Post içine kesinlikle URL veya http adresi yazma."""
+
+    text = await llm(prompt, tokens=900)
     text = re.sub(r'https?://\S+', '', text).strip()
 
     if ref:
-        text += f"\n\n🎯 <b>Referans Kodu:</b> <code>{ref}</code>"
+        text += f"\n\n🎯 <b>Referans Kodun:</b> <code>{ref}</code>"
 
-    # Link satırı — DÜZENLENECEK PLACEHOLDER
-    link = custom_link or airdrop.get("campaign_url") or airdrop.get("url") or ""
-    if link and link.startswith("http"):
-        text += f"\n\n🔗 <a href='{link}'>👉 Hemen Katıl</a>"
+    final_link = link or airdrop.get("campaign_url") or airdrop.get("url", "")
+    if final_link and final_link.startswith("http"):
+        text += f"\n\n🔗 <b><a href='{final_link}'>👉 HEMEN KATIL</a></b>"
     else:
-        text += f"\n\n🔗 <b>[ LİNK BURAYA — düzenle ve gönder ]</b>"
+        text += "\n\n🔗 <b>[ LİNK BURAYA ]</b>"
 
-    text += "\n\n📢 @kriptodropptr"
+    text += "\n\n📢 <b>@kriptodropptr</b>"
     return text
 
 
-async def gpt_score_url(url: str) -> str:
-    results = await tavily_search(f"site:{url} OR \"{url}\" crypto airdrop review", max_results=3)
-    context = "\n".join([r.get("content", "")[:200] for r in results]) if results else ""
-
-    return await gpt_text(
-        f"Bu kripto projeyi analiz et ve puanla: {url}\n\n"
-        f"Web'den bulunan bilgiler:\n{context}\n\n"
-        "⭐ Puan /10 | 🔒 Güvenilirlik | 💰 Kazanç | ⚡ Zorluk | ⚠️ Risk | ✅ Artı | ❌ Eksi | 🎯 Tavsiye\n"
-        "Türkçe, emojili yaz.",
-        max_tokens=500
-    )
-
-
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
 # YARDIMCI
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+def is_admin(u) -> bool:
+    return u.effective_chat.id == ADMIN_CHAT_ID
 
-def is_admin(update) -> bool:
-    return update.effective_chat.id == ADMIN_CHAT_ID
+async def send_to(upd, ctx, text, **kw):
+    if hasattr(upd, "message") and upd.message:
+        return await upd.message.reply_text(text, **kw)
+    return await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, **kw)
 
-
-async def _prepare_and_show(update, ctx: ContextTypes.DEFAULT_TYPE, airdrop: dict, custom_link: str = None):
-    ref = ref_code_store.get("code")
-
-    async def reply_text(text, **kw):
-        if hasattr(update, "message") and update.message:
-            return await update.message.reply_text(text, **kw)
-        return await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, **kw)
-
-    async def reply_photo(photo, caption, **kw):
-        if hasattr(update, "message") and update.message:
-            return await update.message.reply_photo(photo=photo, caption=caption, **kw)
-        return await ctx.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=photo, caption=caption, **kw)
-
-    status_msg = await reply_text(
-        f"⚙️ <b>{airdrop['name']}</b> hazırlanıyor...\n✍️ Post yazılıyor...",
-        parse_mode="HTML"
-    )
-
-    post_text = await gpt_make_post(airdrop, ref, custom_link)
-
-    # Link önizleme görseli
+async def show_preview(upd, ctx, airdrop: dict, custom_link: str = None):
+    ref  = ref_code_store.get("code")
     link = custom_link or airdrop.get("campaign_url") or airdrop.get("url", "")
-    image_url = None
+    coin = airdrop.get("coin_name") or airdrop.get("name", "")
+
+    s = await send_to(upd, ctx,
+        f"⚙️ <b>{coin}</b> hazırlanıyor...\n✍️ Post yazılıyor...", parse_mode="HTML")
+
+    post_text = await make_post(airdrop, ref, link)
+
+    og = None
     if link and link.startswith("http"):
-        await status_msg.edit_text(
-            f"⚙️ <b>{airdrop['name']}</b> hazırlanıyor...\n✅ Post yazıldı\n🖼️ Sayfa görseli çekiliyor...",
-            parse_mode="HTML"
-        )
-        image_url = await get_og_image(link)
+        await s.edit_text(
+            f"⚙️ <b>{coin}</b>\n✅ Post yazıldı\n🖼️ Sayfa görseli çekiliyor...",
+            parse_mode="HTML")
+        og = await og_image(link)
 
-    await status_msg.edit_text(
-        f"✅ <b>{airdrop['name']}</b> hazır! Önizleme geliyor...",
-        parse_mode="HTML"
-    )
-
-    await reply_text("─── 👁️ ÖNİZLEME ───")
+    await s.edit_text(f"✅ <b>{coin}</b> hazır!", parse_mode="HTML")
+    await send_to(upd, ctx, "─── 👁️ ÖNİZLEME ───")
 
     try:
-        if image_url:
-            preview_msg = await reply_photo(image_url, post_text, parse_mode="HTML")
+        if og:
+            if hasattr(upd, "message") and upd.message:
+                pm = await upd.message.reply_photo(photo=og, caption=post_text, parse_mode="HTML")
+            else:
+                pm = await ctx.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=og, caption=post_text, parse_mode="HTML")
         else:
-            preview_msg = await reply_text(post_text, parse_mode="HTML", disable_web_page_preview=False)
+            pm = await send_to(upd, ctx, post_text, parse_mode="HTML", disable_web_page_preview=False)
     except Exception:
-        preview_msg = await reply_text(post_text, parse_mode="HTML", disable_web_page_preview=False)
+        pm = await send_to(upd, ctx, post_text, parse_mode="HTML", disable_web_page_preview=False)
 
-    key = str(preview_msg.message_id)
-    pending_posts[key] = {
-        "text": post_text,
-        "image_url": image_url,
-        "name": airdrop["name"],
-        "airdrop": airdrop,
-        "ref": ref,
-    }
+    key = str(pm.message_id)
+    pending_posts[key] = {"text": post_text, "image_url": og,
+                          "name": coin, "airdrop": airdrop, "ref": ref}
 
-    score_info = f"⭐ {airdrop.get('score','?')}/10 — {airdrop.get('score_reason','')}\n\n" if airdrop.get("score") not in ("?", None) else ""
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Gruba Gönder",   callback_data=f"send|{key}"),
-            InlineKeyboardButton("✏️ Yeniden Yaz",    callback_data=f"rewrite|{key}"),
-        ],
-        [
-            InlineKeyboardButton("🔗 Linki Değiştir", callback_data=f"changelink|{key}"),
-            InlineKeyboardButton("❌ İptal",            callback_data=f"cancel|{key}"),
-        ]
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Gruba Gönder",   callback_data=f"send|{key}"),
+         InlineKeyboardButton("✏️ Yeniden Yaz",    callback_data=f"rewrite|{key}")],
+        [InlineKeyboardButton("🔗 Linki Değiştir", callback_data=f"editlink|{key}"),
+         InlineKeyboardButton("❌ İptal",            callback_data=f"cancel|{key}")]
     ])
-
-    await reply_text(
-        f"⬆️ <b>{airdrop['name']}</b> önizlemesi\n\n{score_info}"
-        "🔗 <i>Linki değiştirmek için 'Linki Değiştir' butonuna bas.</i>\n\nNe yapmak istersin?",
-        parse_mode="HTML",
-        reply_markup=keyboard
-    )
+    await send_to(upd, ctx,
+        f"⬆️ <b>{coin}</b> önizlemesi\n\n"
+        "🔗 <i>Kendi linkini eklemek için → Linki Değiştir</i>",
+        parse_mode="HTML", reply_markup=kb)
 
 
-# ══════════════════════════════════════════════════════
-# KOMUTLAR
-# ══════════════════════════════════════════════════════
-
+# ════════════════════════════════════════════════════════════════════════════
+# /start
+# ════════════════════════════════════════════════════════════════════════════
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_chat.id
     adm = uid == ADMIN_CHAT_ID
     msg = "🪂 <b>KriptoDropptr Bot</b>\n━━━━━━━━━━━━━━━━━━━━━\n\n"
-    msg += f"{'✅ Admin paneline hoş geldin!' if adm else '⛔ Yetkisiz erişim.'}\n\n"
+    msg += "✅ <b>Hoş geldin!</b>\n\n" if adm else "⛔ Yetkisiz.\n\n"
     if adm:
-        ref  = ref_code_store.get("code") or "Ayarlanmamış"
-        tw   = "✅ Aktif" if TAVILY_API_KEY else "❌ Key yok"
+        tw = "✅ Aktif" if TAVILY_API_KEY else "❌ Key yok"
         msg += (
             f"📊 <b>Durum</b>\n"
-            f"├ Ref Kodu: <code>{ref}</code>\n"
+            f"├ Ref: <code>{ref_code_store.get('code') or 'Yok'}</code>\n"
             f"├ Gönderim: <code>{stats_store['sent']}</code>\n"
-            f"├ Web Arama (Tavily): {tw}\n"
+            f"├ Web Arama: {tw}\n"
             f"└ Son: <code>{stats_store['last'] or '—'}</code>\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n🤖 <b>AI AIRDROP MOTORU</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
-            "/scan → Web tara, güncel airdropları getir\n"
-            "/autopick → AI en iyisini seçer\n"
-            "/analyze &lt;url&gt; → Projeyi web'den araştır, puanla\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n📢 <b>PAYLAŞIM</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
-            "/newairdrop &lt;proje&gt; &lt;url&gt; → Post hazırla\n"
-            "/quickdrop &lt;url&gt; → Sadece URL ver\n"
-            "/scheduledrop &lt;proje&gt; &lt;url&gt; &lt;dk&gt; → Zamanlı\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n🤖 <b>AIRDROP MOTORU</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+            "/scan — 30+ platformu tara, güncel airdropları getir\n"
+            "/analyze &lt;url&gt; — URL araştır ve puanla\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n📢 <b>MANUEL</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+            "/newairdrop &lt;coin&gt; &lt;url&gt;\n"
+            "/quickdrop &lt;url&gt;\n"
+            "/scheduledrop &lt;coin&gt; &lt;url&gt; &lt;dakika&gt;\n\n"
             "━━━━━━━━━━━━━━━━━━━━━\n🔗 <b>REFERANS</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
             "/setref &lt;kod&gt; · /clearref · /showref\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n📣 <b>MESAJ &amp; ARAÇLAR</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n📣 <b>ARAÇLAR</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
             "/broadcast · /boldcast · /pin\n"
-            "/translate · /hashtag\n\n"
-            "📈 /stats · /status"
+            "/translate · /hashtag\n"
+            "/stats · /status"
         )
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# /scan
+# ════════════════════════════════════════════════════════════════════════════
 async def scan(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
-    msg = await update.message.reply_text(
-        "🔍 İnternet taranıyor...\n"
-        "📡 Güncel airdrop haberleri aranıyor...\n"
-        "🤖 AI analiz yapıyor..."
+
+    sm = await update.message.reply_text(
+        "🔍 <b>30+ platform taranıyor...</b>\n\n"
+        "🏦 Binance · OKX · Bybit · KuCoin · Gate\n"
+        "🎯 Galxe · Zealy · Layer3 · Intract\n"
+        "⛓️ Arbitrum · Base · Solana · zkSync · Sui\n"
+        "📰 Airdrops.io · CoinMarketCap · CoinGecko\n\n"
+        "⏳ <i>10-25 saniye bekle...</i>",
+        parse_mode="HTML"
     )
+
     try:
-        airdrops = await gpt_find_airdrops()
+        raw      = await run_platform_scans()
+        await sm.edit_text("🤖 <b>AI analiz ediyor, linkler kontrol ediliyor...</b>",
+                           parse_mode="HTML")
 
-        # Gösterilenleri filtrele
-        new = [a for a in airdrops if a.get("name") not in shown_airdrops]
-        if not new:
-            shown_airdrops.clear()
-            new = airdrops
-        for a in new:
-            shown_airdrops.add(a.get("name", ""))
-        airdrops = new
+        airdrops = await extract_airdrops(raw, shown_names)
 
-        await msg.delete()
+        if not airdrops:
+            await sm.edit_text(
+                "❌ Sonuç çıkarılamadı.\n\nTavily API key ekli mi? /status ile kontrol et.")
+            return
 
-        for i, a in enumerate(airdrops):
-            score  = a.get("score", "?")
-            stars  = "⭐" * min(int(score), 5) if isinstance(score, int) else "⭐"
-            ref_badge = "🔁 <b>Referans Sistemi VAR</b>" if a.get("referral") else "➖ Referans yok"
-            campaign = a.get("campaign_url") or a.get("url", "")
+        # Link kontrolü (paralel)
+        airdrops = await verify_links(airdrops)
+
+        # Daha önce gösterilenleri filtrele
+        fresh = [a for a in airdrops
+                 if (a.get("coin_name") or a.get("name","")) not in shown_names]
+        if not fresh:
+            shown_names.clear()
+            fresh = airdrops
+        for a in fresh:
+            shown_names.add(a.get("coin_name") or a.get("name", ""))
+
+        ctx.user_data["scan_results"] = fresh
+        await sm.delete()
+
+        for i, a in enumerate(fresh):
+            coin    = a.get("coin_name") or a.get("name", "")
+            symbol  = a.get("coin_symbol", "")
+            host    = a.get("host_platform", "")
+            score   = a.get("score", "?")
+            stars   = "⭐" * min(int(score), 5) if isinstance(score, int) else "⭐"
+            ref_txt = "🔁 <b>Referans Sistemi VAR</b>" if a.get("referral") else "➖ Referans yok"
+            link_ok = a.get("link_ok")
+            link_badge = (
+                "✅ Link aktif" if link_ok is True
+                else "❌ Link çalışmıyor" if link_ok is False
+                else "⚠️ Link kontrol edilemedi"
+            )
+            s_date = a.get("start_date", "Belirtilmemiş")
+            e_date = a.get("end_date", "Belirtilmemiş")
+            src    = a.get("campaign_url") or a.get("url", "")
+
+            sym_part = f" <code>{symbol}</code>" if symbol else ""
+            host_part = f" — <i>{host}</i>" if host else ""
 
             card = (
-                f"{'━'*28}\n"
-                f"🪂 <b>{i+1}. {a['name']}</b>  <code>[{a.get('category','')}]</code>\n"
-                f"{'━'*28}\n\n"
+                f"{'━'*30}\n"
+                f"🪂 <b>{coin}</b>{sym_part}{host_part}\n"
+                f"{'━'*30}\n\n"
                 f"📝 {a.get('description','')}\n\n"
-                f"📋 <b>Nasıl Katılınır:</b>\n{a.get('how_to_join','')}\n\n"
+                f"📋 <b>Katılım:</b> {a.get('how_to_join','')}\n\n"
                 f"💰 <b>Ödül:</b> {a.get('reward','?')}\n"
-                f"{ref_badge}\n"
+                f"{ref_txt}\n"
             )
             if a.get("referral_bonus"):
-                card += f"🎁 <b>Referans Bonusu:</b> {a['referral_bonus']}\n"
+                card += f"🎁 <b>Bonus:</b> {a['referral_bonus']}\n"
             card += (
-                f"⚡ <b>Zorluk:</b> {a.get('difficulty','?')}  •  "
-                f"⏱ <b>Süre:</b> {a.get('time_required','?')}\n"
-                f"📅 <b>Son Tarih:</b> {a.get('deadline','?')}\n\n"
-                f"{stars} <b>Puan: {score}/10</b> — {a.get('score_reason','')}\n"
+                f"\n📅 <b>Başlangıç:</b> {s_date}\n"
+                f"📅 <b>Bitiş:</b> {e_date}\n\n"
+                f"{stars} <b>Puan: {score}/10</b> — <i>{a.get('score_reason','')}</i>\n\n"
+                f"{link_badge}"
             )
-            if campaign:
-                card += f"\n🔗 <a href='{campaign}'>Kampanya Sayfası</a>"
+            if src:
+                card += f"\n🌐 <a href='{src}'>Kaynak Sayfa</a>"
 
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton(f"📢 Paylaş ({score}/10)", callback_data=f"prepare|{i}"),
-                    InlineKeyboardButton("🔍 Doğrula", callback_data=f"verify|{i}"),
-                ]
-            ])
+            kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton(
+                    "📝 Post Hazırla", callback_data=f"prepare|{i}")
+            ]])
             await update.message.reply_text(
                 card, parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=keyboard
-            )
+                reply_markup=kb)
 
         await update.message.reply_text(
-            f"✅ <b>{len(airdrops)} airdrop bulundu.</b>\n\n"
-            "⚠️ <i>Paylaşmadan önce linkleri kontrol et veya 🔍 Doğrula butonunu kullan.</i>",
+            f"✅ <b>{len(fresh)} airdrop bulundu.</b>\n\n"
+            "👆 Post hazırlamak istediğinin altındaki butona bas.\n"
+            "<i>Kendi linkini post sonrası ekleyebilirsin.</i>",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🤖 AI En İyisini Seçsin", callback_data="autopick_from_scan")],
-                [InlineKeyboardButton("🔄 Farklı Airdroplar Getir", callback_data="rescan")]
-            ])
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔄 Farklı Airdroplar Getir", callback_data="rescan")
+            ]])
         )
+
     except Exception as e:
-        await update.message.reply_text(f"❌ Hata: {e}")
+        logger.exception(e)
+        try:
+            await sm.edit_text(f"❌ Hata: {e}")
+        except Exception:
+            await update.message.reply_text(f"❌ Hata: {e}")
 
 
-async def autopick(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update): return
-    await update.message.reply_text("🤖 AI en iyi airdropu seçiyor...")
-    try:
-        airdrops = await gpt_find_airdrops()
-        best = max(airdrops, key=lambda x: x.get("score", 0))
-        await _prepare_and_show(update, ctx, best)
-    except Exception as e:
-        await update.message.reply_text(f"❌ Hata: {e}")
-
-
+# ════════════════════════════════════════════════════════════════════════════
+# DİĞER KOMUTLAR
+# ════════════════════════════════════════════════════════════════════════════
 async def post_airdrop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
     if len(ctx.args) < 2:
-        await update.message.reply_text("Kullanım: /newairdrop <proje_adı> <url>"); return
-    airdrop = {
-        "name": ctx.args[0], "url": ctx.args[1], "campaign_url": ctx.args[1],
-        "description": "", "reward": "?", "difficulty": "?",
-        "score": None, "score_reason": "", "referral": False,
-        "how_to_join": "", "time_required": "?", "deadline": "?", "category": ""
-    }
-    await _prepare_and_show(update, ctx, airdrop, custom_link=ctx.args[1])
-
+        await update.message.reply_text("Kullanım: /newairdrop <coin_adı> <url>"); return
+    a = {"coin_name": ctx.args[0], "name": ctx.args[0], "url": ctx.args[1],
+         "campaign_url": ctx.args[1], "description": "", "reward": "?",
+         "how_to_join": "", "referral": False, "host_platform": "Manuel",
+         "start_date": "?", "end_date": "?", "score": None}
+    await show_preview(update, ctx, a, custom_link=ctx.args[1])
 
 async def quick_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
     if not ctx.args:
         await update.message.reply_text("Kullanım: /quickdrop <url>"); return
-    url = ctx.args[0]
-    domain = url.split("/")[2].replace("www.", "").split(".")[0].capitalize()
-    airdrop = {
-        "name": domain, "url": url, "campaign_url": url,
-        "description": "", "reward": "?", "difficulty": "?",
-        "score": None, "score_reason": "", "referral": False,
-        "how_to_join": "", "time_required": "?", "deadline": "?", "category": ""
-    }
-    await _prepare_and_show(update, ctx, airdrop, custom_link=url)
-
+    url  = ctx.args[0]
+    name = url.split("/")[2].replace("www.", "").split(".")[0].capitalize()
+    a = {"coin_name": name, "name": name, "url": url, "campaign_url": url,
+         "description": "", "reward": "?", "how_to_join": "", "referral": False,
+         "host_platform": "Manuel", "start_date": "?", "end_date": "?", "score": None}
+    await show_preview(update, ctx, a, custom_link=url)
 
 async def analyze(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
     if not ctx.args:
         await update.message.reply_text("Kullanım: /analyze <url>"); return
-    await update.message.reply_text("🔍 Web'den araştırılıyor...")
-    result = await gpt_score_url(ctx.args[0])
+    url = ctx.args[0]
+    await update.message.reply_text("🔍 Araştırılıyor...")
+    ok, code = await check_url(url)
+    results  = await web_search(f"{url} airdrop review legit 2025", n=4)
+    ctx_txt  = "\n".join([r.get("content", "")[:250] for r in results])
+    result   = await llm(
+        f"Bu kripto projeyi analiz et ve puanla: {url}\n"
+        f"Link durumu: {'Aktif ✅' if ok else 'Çalışmıyor ❌'} (HTTP {code})\n\n"
+        f"Web bilgisi:\n{ctx_txt}\n\n"
+        "⭐ Puan /10 | 🔒 Güvenilirlik | 💰 Kazanç | ⚡ Zorluk | ⚠️ Risk | ✅ Artı | ❌ Eksi | 🎯 Tavsiye\n"
+        "Türkçe, emojili.", 600)
     await update.message.reply_text(f"📊 <b>Analiz:</b>\n\n{result}", parse_mode="HTML")
-
 
 async def schedule_drop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
     if len(ctx.args) < 3:
-        await update.message.reply_text("Kullanım: /scheduledrop <proje> <url> <dakika>"); return
-    project_name, url = ctx.args[0], ctx.args[1]
-    try: minutes = int(ctx.args[2])
+        await update.message.reply_text("Kullanım: /scheduledrop <coin> <url> <dakika>"); return
+    name, url = ctx.args[0], ctx.args[1]
+    try: mins = int(ctx.args[2])
     except ValueError:
         await update.message.reply_text("Dakika sayı olmalı."); return
     ref = ref_code_store.get("code")
-
-    async def send_later(context):
+    async def later(context):
         try:
-            airdrop = {"name": project_name, "url": url, "campaign_url": url, "description": "",
-                       "reward": "?", "difficulty": "?", "score": None, "referral": False,
-                       "how_to_join": "", "time_required": "?", "deadline": "?", "category": ""}
-            text      = await gpt_make_post(airdrop, ref, url)
-            image_url = await get_og_image(url)
-            try:
-                if image_url:
-                    await context.bot.send_photo(chat_id=GROUP_CHAT_ID, photo=image_url, caption=text, parse_mode="HTML")
-                else:
-                    await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=text, parse_mode="HTML", disable_web_page_preview=False)
-            except Exception:
-                await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=text, parse_mode="HTML", disable_web_page_preview=False)
+            a = {"coin_name": name, "name": name, "url": url, "campaign_url": url,
+                 "description": "", "reward": "?", "how_to_join": "", "referral": False,
+                 "host_platform": "Manuel", "start_date": "?", "end_date": "?", "score": None}
+            txt = await make_post(a, ref, url)
+            img = await og_image(url)
+            if img:
+                try:
+                    await context.bot.send_photo(chat_id=GROUP_CHAT_ID, photo=img,
+                                                 caption=txt, parse_mode="HTML")
+                except Exception:
+                    await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=txt,
+                                                   parse_mode="HTML", disable_web_page_preview=False)
+            else:
+                await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=txt,
+                                               parse_mode="HTML", disable_web_page_preview=False)
             stats_store["sent"] += 1
             stats_store["last"] = datetime.now().strftime("%d.%m.%Y %H:%M")
-            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"✅ Zamanlı gönderi: <b>{project_name}</b>", parse_mode="HTML")
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID,
+                text=f"✅ Zamanlı: <b>{name}</b>", parse_mode="HTML")
         except Exception as e:
-            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"❌ Zamanlı gönderi hatası: {e}")
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"❌ Hata: {e}")
+    ctx.job_queue.run_once(later, when=mins * 60)
+    await update.message.reply_text(
+        f"⏰ <b>{name}</b> {mins} dakika sonra gönderilecek!", parse_mode="HTML")
 
-    ctx.job_queue.run_once(send_later, when=minutes * 60)
-    await update.message.reply_text(f"⏰ <b>{project_name}</b> {minutes} dakika sonra gönderilecek!", parse_mode="HTML")
 
+# ════════════════════════════════════════════════════════════════════════════
+# CALLBACK
+# ════════════════════════════════════════════════════════════════════════════
+async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q    = update.callback_query
+    await q.answer()
+    data = q.data
 
-# ══════════════════════════════════════════════════════
-# CALLBACK HANDLER
-# ══════════════════════════════════════════════════════
-
-async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data  = query.data
-
-    # ── Rescan
     if data == "rescan":
-        await query.edit_message_reply_markup(None)
-        class FakeUpdate:
-            effective_chat = query.message.chat
-            message = query.message
-        await scan(FakeUpdate(), ctx)
+        await q.edit_message_reply_markup(None)
+        class FU:
+            effective_chat = q.message.chat
+            message        = q.message
+        await scan(FU(), ctx)
         return
 
-    # ── Doğrula
-    if data.startswith("verify|"):
-        idx = int(data.split("|")[1])
-        airdrops = ctx.user_data.get("scan_results", [])
-        if idx < len(airdrops):
-            a = airdrops[idx]
-            await query.answer("🔍 Doğrulanıyor...", show_alert=False)
-            url = a.get("campaign_url") or a.get("url", "")
-            result = await verify_campaign(url, a["name"])
-            await ctx.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=f"🔍 <b>{a['name']} Doğrulama Sonucu:</b>\n\n{result['note']}",
-                parse_mode="HTML"
-            )
-        return
-
-    # ── Seç (scan'dan)
     if data.startswith("prepare|"):
         idx = int(data.split("|")[1])
-        airdrops = ctx.user_data.get("scan_results", [])
-        if idx < len(airdrops):
-            await query.edit_message_reply_markup(None)
-            airdrop = airdrops[idx]
-            url = airdrop.get("campaign_url") or airdrop.get("url", "")
-            if url and url.startswith("http"):
-                await _prepare_and_show(query, ctx, airdrop, custom_link=url)
+        airs = ctx.user_data.get("scan_results", [])
+        if idx < len(airs):
+            await q.edit_message_reply_markup(None)
+            a    = airs[idx]
+            link = a.get("campaign_url") or a.get("url", "")
+            if link and link.startswith("http"):
+                await show_preview(q, ctx, a, custom_link=link)
             else:
-                ctx.user_data["pending_airdrop"] = airdrop
-                ctx.user_data["awaiting_link"] = True
+                ctx.user_data["pending_airdrop"] = a
+                ctx.user_data["await_link"]      = "new"
                 await ctx.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"🔗 <b>{airdrop['name']}</b> için katılım linkini gönder:",
-                    parse_mode="HTML"
-                )
+                    text=f"🔗 <b>{a.get('coin_name','?')}</b> için katılım linkini gönder:",
+                    parse_mode="HTML")
         return
 
-    # ── Autopick
-    if data == "autopick_from_scan":
-        airdrops = ctx.user_data.get("scan_results", [])
-        if airdrops:
-            best = max(airdrops, key=lambda x: x.get("score", 0))
-            await query.edit_message_reply_markup(None)
-            url = best.get("campaign_url") or best.get("url", "")
-            if url and url.startswith("http"):
-                await _prepare_and_show(query, ctx, best, custom_link=url)
-            else:
-                ctx.user_data["pending_airdrop"] = best
-                ctx.user_data["awaiting_link"] = True
-                await ctx.bot.send_message(
-                    chat_id=ADMIN_CHAT_ID,
-                    text=f"🤖 Seçilen: <b>{best['name']}</b>\n\n🔗 Katılım linkini gönder:",
-                    parse_mode="HTML"
-                )
-        return
-
-    # ── Gruba gönder
     if data.startswith("send|"):
         key  = data.split("|")[1]
         post = pending_posts.get(key)
         if not post:
-            await query.edit_message_text("❌ Post bulunamadı, tekrar dene."); return
+            await q.edit_message_text("❌ Post bulunamadı."); return
         try:
             if post.get("image_url"):
                 try:
                     await ctx.bot.send_photo(
                         chat_id=GROUP_CHAT_ID, photo=post["image_url"],
-                        caption=post["text"], parse_mode="HTML"
-                    )
+                        caption=post["text"], parse_mode="HTML")
                 except Exception:
                     await ctx.bot.send_message(
                         chat_id=GROUP_CHAT_ID, text=post["text"],
-                        parse_mode="HTML", disable_web_page_preview=False
-                    )
+                        parse_mode="HTML", disable_web_page_preview=False)
             else:
                 await ctx.bot.send_message(
                     chat_id=GROUP_CHAT_ID, text=post["text"],
-                    parse_mode="HTML", disable_web_page_preview=False
-                )
+                    parse_mode="HTML", disable_web_page_preview=False)
             stats_store["sent"] += 1
             stats_store["last"] = datetime.now().strftime("%d.%m.%Y %H:%M")
             pending_posts.pop(key, None)
-            await query.edit_message_text(f"✅ <b>{post['name']}</b> gruba gönderildi!", parse_mode="HTML")
+            await q.edit_message_text(
+                f"✅ <b>{post['name']}</b> gruba gönderildi!", parse_mode="HTML")
         except Exception as e:
-            await query.edit_message_text(f"❌ Gönderilemedi: {e}")
+            await q.edit_message_text(f"❌ Gönderilemedi: {e}")
         return
 
-    # ── Yeniden yaz
     if data.startswith("rewrite|"):
         key  = data.split("|")[1]
         post = pending_posts.get(key)
         if not post:
-            await query.edit_message_text("❌ Post bulunamadı."); return
-        await query.edit_message_text("✍️ Yeniden yazılıyor...")
+            await q.edit_message_text("❌ Post bulunamadı."); return
+        await q.edit_message_text("✍️ Yeniden yazılıyor...")
+        new = await llm(
+            f"Bu Telegram airdrop postunu daha çarpıcı yeniden yaz. "
+            f"HTML formatını ve yapıyı koru. URL ekleme:\n\n{post['text']}", 900)
+        new = re.sub(r'https?://\S+', '', new).strip()
+        pending_posts[key]["text"] = new
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Gruba Gönder",   callback_data=f"send|{key}"),
+             InlineKeyboardButton("✏️ Tekrar",         callback_data=f"rewrite|{key}")],
+            [InlineKeyboardButton("🔗 Linki Değiştir", callback_data=f"editlink|{key}"),
+             InlineKeyboardButton("❌ İptal",            callback_data=f"cancel|{key}")]
+        ])
         try:
-            new_text = await gpt_text(
-                f"Bu Telegram airdrop postunu daha çarpıcı ve emojili yeniden yaz, HTML formatını koru, URL ekleme:\n\n{post['text']}",
-                max_tokens=700
-            )
-            new_text = re.sub(r'https?://\S+', '', new_text).strip()
-            pending_posts[key]["text"] = new_text
-
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("✅ Gruba Gönder",   callback_data=f"send|{key}"),
-                    InlineKeyboardButton("✏️ Tekrar",         callback_data=f"rewrite|{key}"),
-                ],
-                [
-                    InlineKeyboardButton("🔗 Linki Değiştir", callback_data=f"changelink|{key}"),
-                    InlineKeyboardButton("❌ İptal",            callback_data=f"cancel|{key}"),
-                ]
-            ])
-            try:
-                if post.get("image_url"):
-                    await ctx.bot.send_photo(
-                        chat_id=ADMIN_CHAT_ID, photo=post["image_url"],
-                        caption=new_text, parse_mode="HTML", reply_markup=keyboard
-                    )
-                else:
-                    await ctx.bot.send_message(
-                        chat_id=ADMIN_CHAT_ID, text=new_text,
-                        parse_mode="HTML", reply_markup=keyboard, disable_web_page_preview=False
-                    )
-            except Exception:
-                await ctx.bot.send_message(
-                    chat_id=ADMIN_CHAT_ID, text=new_text,
-                    parse_mode="HTML", reply_markup=keyboard, disable_web_page_preview=False
-                )
-        except Exception as e:
-            await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"❌ Yeniden yazma hatası: {e}")
+            if post.get("image_url"):
+                await ctx.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=post["image_url"],
+                                         caption=new, parse_mode="HTML", reply_markup=kb)
+            else:
+                await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=new,
+                                           parse_mode="HTML", reply_markup=kb,
+                                           disable_web_page_preview=False)
+        except Exception:
+            await ctx.bot.send_message(chat_id=ADMIN_CHAT_ID, text=new,
+                                       parse_mode="HTML", reply_markup=kb,
+                                       disable_web_page_preview=False)
         return
 
-    # ── Linki değiştir
-    if data.startswith("changelink|"):
+    if data.startswith("editlink|"):
         key = data.split("|")[1]
-        ctx.user_data["changelink_key"] = key
-        ctx.user_data["awaiting_link"]  = True
-        await query.edit_message_reply_markup(None)
+        ctx.user_data["await_link"]      = key
+        ctx.user_data["pending_airdrop"] = None
+        await q.edit_message_reply_markup(None)
         await ctx.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text="🔗 Yeni linki gönder:\n\n<i>(http ile başlayan tam URL)</i>",
-            parse_mode="HTML"
-        )
+            text="🔗 <b>Yeni linki gönder:</b>\n<i>(http ile başlayan tam URL)</i>",
+            parse_mode="HTML")
         return
 
-    # ── İptal
     if data.startswith("cancel|"):
         pending_posts.pop(data.split("|")[1], None)
-        await query.edit_message_text("❌ İptal edildi.")
+        await q.edit_message_text("❌ İptal edildi.")
         return
 
 
-# ══════════════════════════════════════════════════════
-# MESAJ HANDLER — link bekleniyor
-# ══════════════════════════════════════════════════════
-
-async def link_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+# ════════════════════════════════════════════════════════════════════════════
+# MESAJ HANDLER
+# ════════════════════════════════════════════════════════════════════════════
+async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID: return
-    if not ctx.user_data.get("awaiting_link"): return
+    await_link = ctx.user_data.get("await_link")
+    if not await_link: return
 
     text = update.message.text.strip()
     if not text.startswith("http"):
-        await update.message.reply_text("⚠️ Geçerli bir link gönder (http ile başlamalı)"); return
+        await update.message.reply_text("⚠️ http ile başlayan geçerli bir link gönder."); return
 
-    ctx.user_data["awaiting_link"] = False
+    ctx.user_data["await_link"] = None
 
-    # changelink — mevcut postu güncelle
-    changelink_key = ctx.user_data.pop("changelink_key", None)
-    if changelink_key and changelink_key in pending_posts:
-        post = pending_posts[changelink_key]
-        airdrop = post.get("airdrop", {"name": post["name"]})
-        ref = post.get("ref")
-
+    if await_link != "new":
+        key  = await_link
+        post = pending_posts.get(key)
+        if not post:
+            await update.message.reply_text("❌ Post bulunamadı."); return
         await update.message.reply_text("⏳ Link güncelleniyor, görsel çekiliyor...")
-        new_text = await gpt_make_post(airdrop, ref, custom_link=text)
-        image_url = await get_og_image(text)
-
-        pending_posts[changelink_key]["text"] = new_text
-        pending_posts[changelink_key]["image_url"] = image_url
-
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✅ Gruba Gönder",   callback_data=f"send|{changelink_key}"),
-                InlineKeyboardButton("✏️ Yeniden Yaz",    callback_data=f"rewrite|{changelink_key}"),
-            ],
-            [
-                InlineKeyboardButton("🔗 Linki Değiştir", callback_data=f"changelink|{changelink_key}"),
-                InlineKeyboardButton("❌ İptal",            callback_data=f"cancel|{changelink_key}"),
-            ]
+        airdrop   = post.get("airdrop", {"coin_name": post["name"], "name": post["name"]})
+        new_text  = await make_post(airdrop, post.get("ref"), link=text)
+        new_image = await og_image(text)
+        pending_posts[key]["text"]      = new_text
+        pending_posts[key]["image_url"] = new_image
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Gruba Gönder",   callback_data=f"send|{key}"),
+             InlineKeyboardButton("✏️ Yeniden Yaz",    callback_data=f"rewrite|{key}")],
+            [InlineKeyboardButton("🔗 Linki Değiştir", callback_data=f"editlink|{key}"),
+             InlineKeyboardButton("❌ İptal",            callback_data=f"cancel|{key}")]
         ])
-
         await update.message.reply_text("─── 👁️ YENİ ÖNİZLEME ───")
         try:
-            if image_url:
-                await update.message.reply_photo(photo=image_url, caption=new_text, parse_mode="HTML", reply_markup=keyboard)
+            if new_image:
+                await update.message.reply_photo(photo=new_image, caption=new_text,
+                                                 parse_mode="HTML", reply_markup=kb)
             else:
-                await update.message.reply_text(new_text, parse_mode="HTML", reply_markup=keyboard, disable_web_page_preview=False)
+                await update.message.reply_text(new_text, parse_mode="HTML",
+                                                reply_markup=kb, disable_web_page_preview=False)
         except Exception:
-            await update.message.reply_text(new_text, parse_mode="HTML", reply_markup=keyboard, disable_web_page_preview=False)
+            await update.message.reply_text(new_text, parse_mode="HTML",
+                                            reply_markup=kb, disable_web_page_preview=False)
         return
 
-    # scan'dan gelen airdrop için link bekliyordu
     airdrop = ctx.user_data.pop("pending_airdrop", {})
     if not airdrop:
-        await update.message.reply_text("❌ Bekleyen airdrop bulunamadı. /scan ile tekrar dene."); return
-
+        await update.message.reply_text("❌ Bekleyen airdrop yok. /scan ile tekrar dene."); return
     airdrop["url"] = text
     airdrop["campaign_url"] = text
-    await update.message.reply_text("✅ Link alındı! Post hazırlanıyor...")
-    await _prepare_and_show(update, ctx, airdrop, custom_link=text)
+    await update.message.reply_text("✅ Link alındı!")
+    await show_preview(update, ctx, airdrop, custom_link=text)
 
 
-# ══════════════════════════════════════════════════════
-# DİĞER KOMUTLAR
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# MESAJ KOMUTLARI
+# ════════════════════════════════════════════════════════════════════════════
+async def set_ref(u, c):
+    if not is_admin(u): return
+    if not c.args: await u.message.reply_text("Kullanım: /setref <kod>"); return
+    ref_code_store["code"] = c.args[0]
+    await u.message.reply_text(f"✅ Ref: <code>{c.args[0]}</code>", parse_mode="HTML")
 
-async def set_ref_code(update, ctx):
-    if not is_admin(update): return
-    if not ctx.args: await update.message.reply_text("Kullanım: /setref <kod>"); return
-    ref_code_store["code"] = ctx.args[0]
-    await update.message.reply_text(f"✅ Ref kodu: <code>{ctx.args[0]}</code>", parse_mode="HTML")
-
-async def clear_ref(update, ctx):
-    if not is_admin(update): return
+async def clear_ref(u, c):
+    if not is_admin(u): return
     ref_code_store["code"] = None
-    await update.message.reply_text("🗑️ Referans kodu temizlendi.")
+    await u.message.reply_text("🗑️ Ref kodu temizlendi.")
 
-async def show_ref(update, ctx):
-    if not is_admin(update): return
-    await update.message.reply_text(f"🔗 Aktif ref: <code>{ref_code_store.get('code') or 'Yok'}</code>", parse_mode="HTML")
+async def show_ref(u, c):
+    if not is_admin(u): return
+    await u.message.reply_text(
+        f"🔗 Ref: <code>{ref_code_store.get('code') or 'Yok'}</code>", parse_mode="HTML")
 
-async def broadcast(update, ctx):
-    if not is_admin(update): return
-    if not ctx.args: await update.message.reply_text("Kullanım: /broadcast <mesaj>"); return
-    await ctx.bot.send_message(chat_id=GROUP_CHAT_ID, text=" ".join(ctx.args))
-    await update.message.reply_text("✅ Gönderildi.")
+async def broadcast(u, c):
+    if not is_admin(u): return
+    if not c.args: await u.message.reply_text("Kullanım: /broadcast <mesaj>"); return
+    await c.bot.send_message(chat_id=GROUP_CHAT_ID, text=" ".join(c.args))
+    await u.message.reply_text("✅ Gönderildi.")
 
-async def boldcast(update, ctx):
-    if not is_admin(update): return
-    if not ctx.args: await update.message.reply_text("Kullanım: /boldcast <mesaj>"); return
-    await ctx.bot.send_message(
-        chat_id=GROUP_CHAT_ID,
-        text=f"📢 <b>{' '.join(ctx.args)}</b>\n\n— @kriptodropptr",
-        parse_mode="HTML"
-    )
-    await update.message.reply_text("✅ Gönderildi.")
+async def boldcast(u, c):
+    if not is_admin(u): return
+    if not c.args: await u.message.reply_text("Kullanım: /boldcast <mesaj>"); return
+    await c.bot.send_message(chat_id=GROUP_CHAT_ID,
+        text=f"📢 <b>{' '.join(c.args)}</b>\n\n— @kriptodropptr", parse_mode="HTML")
+    await u.message.reply_text("✅ Gönderildi.")
 
-async def pin_message(update, ctx):
-    if not is_admin(update): return
-    if not ctx.args: await update.message.reply_text("Kullanım: /pin <mesaj>"); return
-    sent = await ctx.bot.send_message(
-        chat_id=GROUP_CHAT_ID,
-        text=f"📌 <b>{' '.join(ctx.args)}</b>\n\n📢 @kriptodropptr",
-        parse_mode="HTML"
-    )
+async def pin_msg(u, c):
+    if not is_admin(u): return
+    if not c.args: await u.message.reply_text("Kullanım: /pin <mesaj>"); return
+    sent = await c.bot.send_message(chat_id=GROUP_CHAT_ID,
+        text=f"📌 <b>{' '.join(c.args)}</b>\n\n📢 @kriptodropptr", parse_mode="HTML")
     try:
-        await ctx.bot.pin_chat_message(chat_id=GROUP_CHAT_ID, message_id=sent.message_id)
-        await update.message.reply_text("✅ Sabitlendi.")
+        await c.bot.pin_chat_message(chat_id=GROUP_CHAT_ID, message_id=sent.message_id)
+        await u.message.reply_text("✅ Sabitlendi.")
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Gönderdim ama sabitlemedim: {e}")
+        await u.message.reply_text(f"⚠️ Gönderdim ama sabitlemedim: {e}")
 
-async def translate(update, ctx):
-    if not is_admin(update): return
-    if not ctx.args: await update.message.reply_text("Kullanım: /translate <metin>"); return
-    result = await gpt_text(f"Türkçeye çevir ve özetle:\n\n{' '.join(ctx.args)}", max_tokens=300)
-    await update.message.reply_text(f"🇹🇷 <b>Çeviri:</b>\n\n{result}", parse_mode="HTML")
+async def translate(u, c):
+    if not is_admin(u): return
+    if not c.args: await u.message.reply_text("Kullanım: /translate <metin>"); return
+    r = await llm(f"Türkçeye çevir ve özetle:\n\n{' '.join(c.args)}", 300)
+    await u.message.reply_text(f"🇹🇷 <b>Çeviri:</b>\n\n{r}", parse_mode="HTML")
 
-async def hashtag(update, ctx):
-    if not is_admin(update): return
-    if not ctx.args: await update.message.reply_text("Kullanım: /hashtag <proje>"); return
-    result = await gpt_text(f"{' '.join(ctx.args)} kripto projesi için 10 hashtag üret.", max_tokens=150)
-    await update.message.reply_text(f"#️⃣ <b>Hashtagler:</b>\n\n{result}", parse_mode="HTML")
+async def hashtag(u, c):
+    if not is_admin(u): return
+    if not c.args: await u.message.reply_text("Kullanım: /hashtag <proje>"); return
+    r = await llm(f"{' '.join(c.args)} kripto projesi için 10 hashtag üret.", 150)
+    await u.message.reply_text(f"#️⃣ <b>Hashtagler:</b>\n\n{r}", parse_mode="HTML")
 
-async def stats(update, ctx):
-    if not is_admin(update): return
-    await update.message.reply_text(
+async def stats(u, c):
+    if not is_admin(u): return
+    await u.message.reply_text(
         f"📈 <b>İstatistikler</b>\n\n"
-        f"📤 Toplam: <code>{stats_store['sent']}</code>\n"
+        f"📤 Gönderim: <code>{stats_store['sent']}</code>\n"
         f"🕐 Son: <code>{stats_store['last'] or '—'}</code>\n"
-        f"🔗 Ref: <code>{ref_code_store.get('code') or 'Yok'}</code>",
-        parse_mode="HTML"
-    )
+        f"🔗 Ref: <code>{ref_code_store.get('code') or 'Yok'}</code>", parse_mode="HTML")
 
-async def status(update, ctx):
-    if not is_admin(update): return
-    await update.message.reply_text(
+async def status(u, c):
+    if not is_admin(u): return
+    await u.message.reply_text(
         f"🟢 <b>Bot Aktif</b>\n\n"
-        f"🤖 Model: Llama 3.3 70B (Groq)\n"
-        f"🔍 Web Arama: {'Tavily ✅' if TAVILY_API_KEY else '❌ Key yok'}\n"
-        f"🖼️ Görsel: OG Image (otomatik)\n"
+        f"🤖 Groq Llama 3.3 70B\n"
+        f"🔍 Tavily: {'✅ Aktif' if TAVILY_API_KEY else '❌ Key eksik'}\n"
+        f"🖼️ OG Image: Otomatik\n"
+        f"🔗 Link Kontrol: Aktif\n"
         f"📡 Grup: <code>{GROUP_CHAT_ID}</code>\n"
-        f"👤 Admin: <code>{ADMIN_CHAT_ID}</code>\n"
-        f"🔗 Ref: <code>{ref_code_store.get('code') or 'Yok'}</code>",
-        parse_mode="HTML"
-    )
+        f"👤 Admin: <code>{ADMIN_CHAT_ID}</code>", parse_mode="HTML")
 
-async def help_command(update, ctx):
-    if not is_admin(update): return
-    await update.message.reply_text(
-        "💡 <b>Hızlı Başlangıç:</b>\n\n"
-        "1️⃣ /scan → Web'den güncel airdrop bul\n"
-        "2️⃣ 🔍 Doğrula → Kampanya gerçek mi kontrol et\n"
-        "3️⃣ 📢 Seç → Post hazırla\n"
-        "4️⃣ 🔗 Linki Değiştir → Kendi linkini ekle\n"
-        "5️⃣ ✅ Gruba Gönder\n\n"
-        "Tüm komutlar: /start",
-        parse_mode="HTML"
-    )
+async def help_cmd(u, c):
+    if not is_admin(u): return
+    await u.message.reply_text(
+        "💡 <b>Akış:</b>\n\n"
+        "1️⃣ /scan → Platformları tara\n"
+        "2️⃣ 📝 Post Hazırla → Seç\n"
+        "3️⃣ 🔗 Linki Değiştir → Kendi linkini ekle\n"
+        "4️⃣ ✅ Gruba Gönder\n\n"
+        "/start — Tüm komutlar", parse_mode="HTML")
 
 
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
 # MAIN
-# ══════════════════════════════════════════════════════
-
+# ════════════════════════════════════════════════════════════════════════════
 def main():
-    if not BOT_TOKEN:
-        logger.error("❌ BOT_TOKEN bulunamadı!")
-        sys.exit(1)
-    if not GROQ_API_KEY:
-        logger.error("❌ GROQ_API_KEY bulunamadı!")
-        sys.exit(1)
-
-    logger.info(f"✅ ADMIN_CHAT_ID: {ADMIN_CHAT_ID}")
-    logger.info(f"✅ Tavily: {'Aktif' if TAVILY_API_KEY else 'Yok (web arama devre dışı)'}")
+    if not BOT_TOKEN:    logger.error("❌ BOT_TOKEN yok!"); sys.exit(1)
+    if not GROQ_API_KEY: logger.error("❌ GROQ_API_KEY yok!"); sys.exit(1)
+    logger.info(f"✅ Admin:{ADMIN_CHAT_ID} Tavily:{'var' if TAVILY_API_KEY else 'YOK'}")
 
     app = Application.builder().token(BOT_TOKEN).build()
-
     for cmd, fn in [
-        ("start", start), ("help", help_command),
-        ("scan", scan), ("autopick", autopick), ("analyze", analyze),
+        ("start", start), ("help", help_cmd),
+        ("scan", scan), ("analyze", analyze),
         ("newairdrop", post_airdrop), ("quickdrop", quick_drop),
         ("scheduledrop", schedule_drop),
-        ("setref", set_ref_code), ("clearref", clear_ref), ("showref", show_ref),
-        ("broadcast", broadcast), ("boldcast", boldcast), ("pin", pin_message),
+        ("setref", set_ref), ("clearref", clear_ref), ("showref", show_ref),
+        ("broadcast", broadcast), ("boldcast", boldcast), ("pin", pin_msg),
         ("translate", translate), ("hashtag", hashtag),
         ("stats", stats), ("status", status),
     ]:
         app.add_handler(CommandHandler(cmd, fn))
-
-    app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, link_handler))
+    app.add_handler(CallbackQueryHandler(on_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
 
     logger.info("🚀 Polling başlıyor...")
     app.run_polling(allowed_updates=["message", "callback_query"])
-
 
 if __name__ == "__main__":
     main()
