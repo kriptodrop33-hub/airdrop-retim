@@ -1,532 +1,677 @@
 import os
+import re
 import asyncio
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, filters
-)
+import requests
 from groq import Groq
 from tavily import TavilyClient
-import requests
 from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ContextTypes, filters
+)
+from telegram.constants import ParseMode, ChatAction
 
-# Logging
+# ══════════════════════════════════════════════════════════
+#  LOGGING
+# ══════════════════════════════════════════════════════════
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s | %(levelname)s | %(message)s",
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ENV Variables
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
-UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY")
-ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", 0))
-GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", 0))
+# ══════════════════════════════════════════════════════════
+#  ENV
+# ══════════════════════════════════════════════════════════
+BOT_TOKEN           = os.environ["BOT_TOKEN"]
+GROQ_API_KEY        = os.environ["GROQ_API_KEY"]
+TAVILY_API_KEY      = os.environ["TAVILY_API_KEY"]
+UNSPLASH_ACCESS_KEY = os.environ["UNSPLASH_ACCESS_KEY"]
+ADMIN_CHAT_ID       = int(os.environ["ADMIN_CHAT_ID"])
+GROUP_CHAT_ID       = int(os.environ["GROUP_CHAT_ID"])
 
-# API Clients
-groq_client = Groq(api_key=GROQ_API_KEY)
+groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 
+# ══════════════════════════════════════════════════════════
+#  ADMIN GUARD
+# ══════════════════════════════════════════════════════════
+def admin_only(func):
+    """Decorator: yalnızca admin DM'den erişebilir."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id   = update.effective_user.id
+        chat_type = update.effective_chat.type
+        if user_id != ADMIN_CHAT_ID or chat_type != "private":
+            await update.message.reply_text("⛔ Bu bot yalnızca admin DM üzerinden kullanılabilir.")
+            return
+        return await func(update, context)
+    wrapper.__name__ = func.__name__
+    return wrapper
 
-# ─────────────────────────────────────────────
-# YARDIMCI FONKSİYONLAR
-# ─────────────────────────────────────────────
+def admin_only_callback(func):
+    """Decorator: callback butonlar için admin guard."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        if user_id != ADMIN_CHAT_ID:
+            await update.callback_query.answer("⛔ Yetkisiz erişim.", show_alert=True)
+            return
+        return await func(update, context)
+    wrapper.__name__ = func.__name__
+    return wrapper
 
-def search_airdrops(query: str = None) -> list:
-    """Tavily ile airdrop ara"""
-    if not query:
-        query = "crypto airdrop 2024 2025 free tokens claim now active"
-    
+# ══════════════════════════════════════════════════════════
+#  GROQ — AI ÜRETME
+# ══════════════════════════════════════════════════════════
+def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75) -> str:
     try:
-        results = tavily_client.search(
+        r = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": system},
+                      {"role": "user",   "content": user}],
+            max_tokens=tokens,
+            temperature=temp,
+        )
+        return r.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Groq hata: {e}")
+        return "❌ AI yanıt üretemedi."
+
+# ══════════════════════════════════════════════════════════
+#  TAVILY — DERIN ARAMA
+# ══════════════════════════════════════════════════════════
+AIRDROP_DOMAINS = [
+    "airdrops.io", "earnifi.com", "cryptorank.io", "dappradar.com",
+    "coinmarketcap.com", "coingecko.com", "coindesk.com", "decrypt.co",
+    "cointelegraph.com", "theblock.co", "beincrypto.com", "cryptoslate.com",
+    "blockworks.co", "twitter.com", "x.com", "medium.com", "mirror.xyz"
+]
+
+def deep_search(query: str, max_results: int = 10) -> list[dict]:
+    """Tavily advanced search – tüm kaynakları tara."""
+    try:
+        r = tavily_client.search(
             query=query,
             search_depth="advanced",
-            max_results=8,
-            include_domains=["coinmarketcap.com", "coingecko.com", "airdrops.io", 
-                           "cryptorank.io", "coindesk.com", "decrypt.co",
-                           "cointelegraph.com", "dappradar.com"]
+            max_results=max_results,
+            include_answer=True,
         )
-        return results.get("results", [])
+        return r.get("results", [])
     except Exception as e:
-        logger.error(f"Tavily arama hatası: {e}")
+        logger.error(f"Tavily hata: {e}")
         return []
 
-
-def get_unsplash_image(query: str = "cryptocurrency blockchain") -> str | None:
-    """Unsplash'tan ilgili görsel URL al"""
+def fetch_url_content(url: str) -> str:
+    """URL içeriğini Tavily extract ile çek."""
     try:
-        url = f"https://api.unsplash.com/search/photos"
-        params = {
-            "query": query,
-            "per_page": 5,
-            "orientation": "landscape",
-            "client_id": UNSPLASH_ACCESS_KEY
-        }
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-        results = data.get("results", [])
+        r = tavily_client.extract(urls=[url])
+        results = r.get("results", [])
+        if results:
+            return results[0].get("raw_content", "")[:3000]
+    except Exception as e:
+        logger.error(f"URL çekme hata: {e}")
+    return ""
+
+def is_url(text: str) -> bool:
+    return bool(re.match(r"https?://\S+", text.strip()))
+
+# ══════════════════════════════════════════════════════════
+#  UNSPLASH — GÖRSEL
+# ══════════════════════════════════════════════════════════
+def get_image(query: str = "cryptocurrency airdrop") -> str | None:
+    try:
+        r = requests.get(
+            "https://api.unsplash.com/search/photos",
+            params={"query": query, "per_page": 6, "orientation": "landscape",
+                    "client_id": UNSPLASH_ACCESS_KEY},
+            timeout=10,
+        )
+        results = r.json().get("results", [])
         if results:
             import random
-            photo = random.choice(results[:3])
-            return photo["urls"]["regular"]
+            return random.choice(results[:4])["urls"]["regular"]
     except Exception as e:
-        logger.error(f"Unsplash hatası: {e}")
+        logger.error(f"Unsplash hata: {e}")
     return None
 
+# ══════════════════════════════════════════════════════════
+#  ARAŞTIRMA FONKSİYONLARI
+# ══════════════════════════════════════════════════════════
 
-def groq_generate(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -> str:
-    """Groq ile metin üret"""
-    try:
-        completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            max_tokens=max_tokens,
-            temperature=0.7
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        logger.error(f"Groq hatası: {e}")
-        return "❌ AI yanıt üretilemedi. Lütfen tekrar deneyin."
+def research_airdrop_by_name(name: str) -> dict:
+    """
+    Airdrop adına göre derin araştırma:
+    - 3 farklı arama sorgusu
+    - AI ile kapsamlı analiz
+    """
+    queries = [
+        f"{name} airdrop how to claim eligibility 2025",
+        f"{name} token airdrop rewards tasks deadline",
+        f"{name} crypto project tokenomics community airdrop guide",
+    ]
+    all_results = []
+    for q in queries:
+        all_results.extend(deep_search(q, max_results=5))
 
+    # Tekrar edenleri filtrele
+    seen_urls = set()
+    unique = []
+    for item in all_results:
+        url = item.get("url", "")
+        if url not in seen_urls:
+            seen_urls.add(url)
+            unique.append(item)
 
-def format_airdrop_post(airdrop_info: str, platform_name: str = "") -> str:
-    """Airdrop için Telegram grup postu oluştur"""
-    system = """Sen bir kripto para ve airdrop uzmanısın. 
-Telegram grupları için çekici, bilgilendirici airdrop paylaşım postları yazıyorsun.
-Türkçe yaz. Emoji kullan. Kısa ve etkili ol.
-Post şu bölümleri içermeli:
-1. Başlık (büyük, dikkat çekici)
-2. Proje hakkında kısa bilgi
-3. Airdrop detayları (ödül, nasıl katılınır)
-4. Görevler listesi (varsa)
-5. Son tarih (varsa)
-6. [REFERANS LİNKİ] placeholder'ı (kullanıcı kendi linkini ekleyecek)
-7. Önemli notlar
-Maksimum 400 kelime. Telegram Markdown formatı kullan."""
-
-    user = f"""Şu airdrop/platform için Telegram grup postu hazırla:
-
-{airdrop_info}
-
-{f'Platform adı: {platform_name}' if platform_name else ''}
-
-Referans linki için "[🔗 KATILIM LİNKİ BURAYA]" placeholder'ı ekle.
-Post sonuna "#airdrop #crypto #freetoken" hashtaglerini ekle."""
-
-    return groq_generate(system, user, max_tokens=800)
-
-
-def analyze_airdrops_with_ai(search_results: list) -> str:
-    """Bulunan airdropları AI ile analiz et ve özetle"""
-    if not search_results:
-        return "Şu anda aktif airdrop bulunamadı."
-    
-    results_text = "\n\n".join([
-        f"Kaynak: {r.get('url', 'N/A')}\nBaşlık: {r.get('title', 'N/A')}\nİçerik: {r.get('content', 'N/A')[:300]}"
-        for r in search_results[:6]
+    raw_text = "\n\n".join([
+        f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:500]}"
+        for i, r in enumerate(unique[:10])
     ])
-    
-    system = """Sen bir kripto airdrop analistsin. 
-Verilen arama sonuçlarından aktif ve değerli airdropları tespit et.
-Her airdrop için şunları belirt: İsim, ödül miktarı, katılım koşulları, son tarih, güvenilirlik puanı.
-Türkçe yaz. Emoji kullan."""
 
-    user = f"""Şu arama sonuçlarından aktif airdropları analiz et ve listele:
-
-{results_text}
-
-Her airdrop için:
-🪂 **İsim:** 
-💰 **Ödül:** 
-📋 **Görevler:** 
-⏰ **Son Tarih:** 
-⭐ **Güvenilirlik:** (1-5)
-🔗 **Link:** 
-
-formatında yaz."""
-
-    return groq_generate(system, user, max_tokens=1200)
+    return {"name": name, "raw": raw_text, "sources": unique[:10]}
 
 
-# ─────────────────────────────────────────────
-# KOMUT İŞLEYİCİLERİ
-# ─────────────────────────────────────────────
+def research_airdrop_by_url(url: str) -> dict:
+    """
+    URL'ye göre derin araştırma:
+    - URL içeriğini çek
+    - Ek arama sorgularıyla zenginleştir
+    """
+    content = fetch_url_content(url)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Bot başlatma"""
-    keyboard = [
-        [InlineKeyboardButton("🔍 Airdrop Tara", callback_data="scan_airdrops")],
-        [InlineKeyboardButton("✍️ Post Oluştur", callback_data="create_post")],
-        [InlineKeyboardButton("📢 Gruba Gönder", callback_data="send_to_group")],
-        [InlineKeyboardButton("❓ Yardım", callback_data="help")]
+    # İçerikten proje adı çıkar (AI ile)
+    name_hint = ai(
+        "Extract the project or airdrop name from the text. Reply with ONLY the name, nothing else.",
+        content[:500] if content else url,
+        tokens=50, temp=0.1
+    )
+
+    extra = deep_search(f"{name_hint} airdrop claim guide tasks 2025", max_results=6)
+    extra_text = "\n\n".join([
+        f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:400]}"
+        for i, r in enumerate(extra[:6])
+    ])
+
+    raw = f"=== SAYFA İÇERİĞİ ===\n{content}\n\n=== EK KAYNAKLAR ===\n{extra_text}"
+    return {"name": name_hint.strip(), "raw": raw, "sources": extra[:6], "url": url}
+
+
+def analyze_research(data: dict) -> str:
+    """AI ile araştırma verisini analiz et."""
+    system = """Sen deneyimli bir kripto airdrop araştırmacısısın.
+Verilen ham veriyi analiz edip şu başlıkları doldur:
+
+PROJE HAKKINDA: (2-3 cümle özet)
+TOKEN BİLGİSİ: (sembol, zincir, toplam arz varsa)
+AIRDROP ÖDÜLÜ: (miktarı, değeri varsa)
+UYGUNLUK KOŞULLARI: (kimler alabilir)
+GÖREVLER: (adım adım liste)
+SON TARİH: (varsa)
+KATILIM LİNKİ: (varsa bul)
+RİSK SKORU: (Düşük / Orta / Yüksek) + kısa gerekçe
+GÜVENİLİRLİK: ⭐⭐⭐⭐⭐ (1-5 yıldız)
+
+Eğer bilgi yoksa "Bilinmiyor" yaz. Türkçe yaz."""
+
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=1500)
+
+
+def scan_active_airdrops() -> str:
+    """İnterneti tara, aktif airdropları bul ve AI ile özetle."""
+    queries = [
+        "best active crypto airdrop claim free tokens 2025",
+        "new airdrop this week ethereum solana layer2 2025",
+        "upcoming airdrop allocation snapshot eligible 2025",
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
+    all_results = []
+    for q in queries:
+        all_results.extend(deep_search(q, max_results=6))
+
+    seen = set()
+    unique = []
+    for r in all_results:
+        u = r.get("url", "")
+        if u not in seen:
+            seen.add(u)
+            unique.append(r)
+
+    raw = "\n\n".join([
+        f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('content','')[:400]}"
+        for i, r in enumerate(unique[:12])
+    ])
+
+    system = """Sen kripto airdrop listesi hazırlayan bir analistsin.
+Verilen arama sonuçlarından FARKLI 5-8 aktif airdrop tespit et.
+Her biri için şunu yaz:
+
+🪂 *[PROJE ADI]*
+├ 💰 Ödül: ...
+├ ⛓ Zincir: ...
+├ 📋 Görev: ...
+├ ⏰ Son Tarih: ...
+├ ⭐ Güvenilirlik: (1-5)
+└ 🔗 Link: ...
+
+Türkçe yaz. Tekrar eden projeleri çıkar. Bilinmiyorsa "?" yaz."""
+
+    return ai(system, raw, tokens=2000)
+
+# ══════════════════════════════════════════════════════════
+#  POST OLUŞTURMA
+# ══════════════════════════════════════════════════════════
+
+POST_SYSTEM = """Sen Telegram kripto grupları için viral airdrop postları yazan uzmansın.
+
+KURAL:
+- Türkçe yaz
+- Telegram MarkdownV2 DEĞİL, normal Markdown (*bold*, _italic_) kullan
+- Maksimum emojilerle dikkat çekici yap
+- Post şablonunu AYNEN kullan, boşluk bırakma
+- Maksimum 900 karakter (caption limiti için)
+
+ŞABLON:
+🚨 *[PROJE ADI] AİRDROP* 🚨
+
+━━━━━━━━━━━━━━━━━━━━
+🏆 *ÖDÜL:* [miktar token / tahmini değer]
+⛓ *ZİNCİR:* [blockchain]
+👥 *UYGUNLUK:* [kimler katılabilir]
+━━━━━━━━━━━━━━━━━━━━
+
+📋 *GÖREVLER:*
+✅ [görev 1]
+✅ [görev 2]
+✅ [görev 3]
+✅ [görev 4]
+
+⏰ *SON TARİH:* [tarih veya "Sınırlı süre!"]
+━━━━━━━━━━━━━━━━━━━━
+
+🔥 *KATIL & KAZAN:*
+👉 [🔗 REFERANS LİNKİ BURAYA]
+
+⚠️ _Hızlı ol! Kontenjan dolmadan katıl._
+
+#Airdrop #Kripto #ÜcretizToken #Crypto"""
+
+
+def build_post(analysis: str, project_name: str) -> str:
+    return ai(
+        POST_SYSTEM,
+        f"Proje: {project_name}\n\nAraştırma analizi:\n{analysis}",
+        tokens=900,
+        temp=0.8,
+    )
+
+# ══════════════════════════════════════════════════════════
+#  TELEGRAM HELPERS
+# ══════════════════════════════════════════════════════════
+
+def main_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Airdrop Tara", callback_data="scan"),
+         InlineKeyboardButton("✍️ Post Oluştur", callback_data="manual_post")],
+        [InlineKeyboardButton("📢 Gruba Gönder (Metin)", callback_data="send_text"),
+         InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_photo")],
+        [InlineKeyboardButton("🔄 Yeni Araştırma", callback_data="new_research"),
+         InlineKeyboardButton("❓ Yardım", callback_data="help")],
+    ])
+
+def post_actions() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Gruba Gönder (Metin)", callback_data="send_text"),
+         InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_photo")],
+        [InlineKeyboardButton("♻️ Postu Yenile", callback_data="regen_post"),
+         InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
+    ])
+
+async def typing(update: Update):
+    await update.effective_chat.send_action(ChatAction.TYPING)
+
+def safe_md(text: str) -> str:
+    """Markdown parse hatalarına karşı temizle."""
+    return text.replace("**", "*")
+
+# ══════════════════════════════════════════════════════════
+#  KOMUTLAR
+# ══════════════════════════════════════════════════════════
+
+@admin_only
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     await update.message.reply_text(
-        "🚀 *Airdrop Bot'a Hoş Geldiniz!*\n\n"
-        "Bu bot ile:\n"
-        "• 🔍 İnterneti tarayarak aktif airdropları bulabilirsiniz\n"
-        "• ✍️ Herhangi bir platform için post oluşturabilirsiniz\n"
-        "• 📢 Hazırlanan postları gruba gönderebilirsiniz\n\n"
-        "Ne yapmak istersiniz?",
-        parse_mode="Markdown",
-        reply_markup=reply_markup
+        "🤖 *AIRDROP BOT* — Admin Paneli\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔍 *Airdrop Tara* → İnterneti tara, aktif airdropları listele\n"
+        "✍️ *Post Oluştur* → Airdrop adı veya link at, derin araştır\n"
+        "📢 *Gruba Gönder* → Hazır postu gruba gönder\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "💡 _Airdrop adı veya linki direkt yazabilirsin._",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_menu(),
     )
 
+@admin_only
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📖 *KOMUTLAR*\n\n"
+        "/start — Ana menü\n"
+        "/scan — İnterneti tara, aktif airdropları listele\n"
+        "/post `[isim]` — İsme göre araştır & post oluştur\n"
+        "/sendgroup — Son postu gruba gönder\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 *Direkt mesaj:*\n"
+        "• Bir URL at → sayfa derin araştırılır\n"
+        "• Airdrop adı yaz → derin araştırma başlar\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "⚠️ Post hazır olunca `[🔗 REFERANS LİNKİ BURAYA]`\n"
+        "yerine kendi referans linkini yapıştır.",
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Yardım komutu"""
-    help_text = """
-🤖 *AIRDROP BOT KOMUTLARI*
+@admin_only
+async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text(
+        "🌐 *İnternet taranıyor...*\n_Aktif airdroplar aranıyor, lütfen bekle (20-30 sn)_",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    await update.effective_chat.send_action(ChatAction.TYPING)
 
-*Tarama Komutları:*
-/scan - Genel airdrop taraması yap
-/scan [konu] - Belirli bir konuyu tara
-Örnek: `/scan Solana airdrop`
+    result = scan_active_airdrops()
+    context.user_data["last_scan"] = result
 
-*Post Oluşturma:*
-/post [platform/airdrop adı] - Platform için post hazırla
-Örnek: `/post Arbitrum airdrop`
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
+        [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan"),
+         InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
+    ])
 
-*Metin ile post:*
-/createpost - Detaylı bilgi vererek post oluştur
-(Komutu girdikten sonra bilgileri yazın)
-
-*Grup İşlemleri:*
-/sendgroup - Son oluşturulan postu gruba gönder
-
-*Diğer:*
-/start - Ana menü
-/help - Bu yardım mesajı
-
-💡 *İpucu:* Post oluşturulduktan sonra referans linkinizi [🔗 KATILIM LİNKİ BURAYA] yazan yere ekleyin!
-"""
-    await update.message.reply_text(help_text, parse_mode="Markdown")
-
-
-async def scan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Airdrop tarama komutu"""
-    query = " ".join(context.args) if context.args else None
-    
-    msg = await update.message.reply_text("🔍 Airdroplar taranıyor, lütfen bekleyin...")
-    
-    # Tavily ile ara
-    search_query = f"{query} airdrop crypto free tokens claim" if query else "best active crypto airdrop 2025 claim free"
-    results = search_airdrops(search_query)
-    
-    if not results:
-        await msg.edit_text("❌ Arama sonucu bulunamadı. Lütfen tekrar deneyin.")
-        return
-    
-    # AI ile analiz et
-    await msg.edit_text("🤖 Sonuçlar AI ile analiz ediliyor...")
-    analysis = analyze_airdrops_with_ai(results)
-    
-    # Sonuçları gönder
-    keyboard = [
-        [InlineKeyboardButton("📝 Post Oluştur", callback_data=f"create_post_from_scan")],
-        [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan_airdrops")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
     await msg.edit_text(
-        f"✅ *TARAMA TAMAMLANDI*\n\n{analysis}",
-        parse_mode="Markdown",
-        reply_markup=reply_markup
+        f"✅ *TARAMA TAMAMLANDI*\n\n{safe_md(result)}",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=keyboard,
     )
-    
-    # Context'e kaydet
-    context.user_data["last_scan"] = analysis
 
-
-async def post_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Hızlı post oluşturma komutu"""
+@admin_only
+async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
-            "⚠️ Kullanım: `/post [platform veya airdrop adı]`\n\n"
-            "Örnek: `/post Arbitrum airdrop` veya `/post zkSync`",
-            parse_mode="Markdown"
+            "⚠️ Kullanım: `/post [airdrop adı]`\nÖrnek: `/post Arbitrum`",
+            parse_mode=ParseMode.MARKDOWN,
         )
         return
-    
-    platform = " ".join(context.args)
-    msg = await update.message.reply_text(f"🔍 *{platform}* hakkında bilgi toplanıyor...")
-    
-    # Tavily ile platform hakkında ara
-    results = search_airdrops(f"{platform} airdrop how to claim eligibility rewards")
-    
-    await msg.edit_text("✍️ Post hazırlanıyor...")
-    
-    # Sonuçları birleştir
-    context_text = "\n".join([
-        f"{r.get('title', '')}: {r.get('content', '')[:200]}"
-        for r in results[:4]
-    ])
-    
-    post_content = format_airdrop_post(
-        f"Platform: {platform}\n\nBulunan bilgiler:\n{context_text}",
-        platform
-    )
-    
-    # Post'u kaydet
-    context.user_data["last_post"] = post_content
-    context.user_data["last_post_platform"] = platform
-    
-    keyboard = [
-        [InlineKeyboardButton("📢 Gruba Gönder", callback_data="send_to_group")],
-        [InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_with_image")],
-        [InlineKeyboardButton("✏️ Düzenle", callback_data="edit_post")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await msg.edit_text(
-        f"✅ *POST HAZIR!*\n\n{post_content}\n\n"
-        "━━━━━━━━━━━━━━━\n"
-        "⚠️ *Not:* `[🔗 KATILIM LİNKİ BURAYA]` kısmına referans linkinizi ekleyin!",
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
+    name = " ".join(context.args)
+    await _do_research(update, context, name)
 
+@admin_only
+async def cmd_sendgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _send_to_group(update, context, with_photo=False)
 
-async def createpost_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Detaylı post oluşturma - kullanıcıdan bilgi ister"""
-    context.user_data["waiting_for"] = "post_details"
-    
-    await update.message.reply_text(
-        "✍️ *Post Oluştur*\n\n"
-        "Airdrop veya platform hakkında bilgi girin:\n\n"
-        "• Platform/proje adı\n"
-        "• Ödül miktarı (biliyorsanız)\n"
-        "• Katılım koşulları\n"
-        "• Son tarih (varsa)\n\n"
-        "Bilgileri tek mesajda yazabilirsiniz:",
-        parse_mode="Markdown"
-    )
+# ══════════════════════════════════════════════════════════
+#  MESAJ İŞLEYİCİ — URL veya Airdrop Adı
+# ══════════════════════════════════════════════════════════
 
-
-async def sendgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Son postu gruba gönder"""
-    # Admin kontrolü
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("⛔ Bu komutu sadece admin kullanabilir.")
-        return
-    
-    last_post = context.user_data.get("last_post")
-    if not last_post:
-        await update.message.reply_text("⚠️ Henüz bir post oluşturulmadı. Önce `/post` komutunu kullanın.")
-        return
-    
-    try:
-        await context.bot.send_message(
-            chat_id=GROUP_CHAT_ID,
-            text=last_post,
-            parse_mode="Markdown"
-        )
-        await update.message.reply_text("✅ Post gruba başarıyla gönderildi!")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Gönderme hatası: {e}")
-
-
+@admin_only
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Genel mesaj işleyici"""
-    text = update.message.text
-    waiting_for = context.user_data.get("waiting_for")
-    
-    if waiting_for == "post_details":
+    text = update.message.text.strip()
+    waiting = context.user_data.get("waiting_for")
+
+    # Post düzenleme (referans linki ekleme)
+    if waiting == "edit_post":
         context.user_data["waiting_for"] = None
-        msg = await update.message.reply_text("✍️ Yazıyor...")
-        
-        post_content = format_airdrop_post(text)
-        context.user_data["last_post"] = post_content
-        
-        keyboard = [
-            [InlineKeyboardButton("📢 Gruba Gönder", callback_data="send_to_group")],
-            [InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_with_image")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await msg.edit_text(
-            f"✅ *POST HAZIR!*\n\n{post_content}\n\n"
-            "━━━━━━━━━━━━━━━\n"
-            "⚠️ `[🔗 KATILIM LİNKİ BURAYA]` kısmına referans linkinizi ekleyin!",
-            parse_mode="Markdown",
-            reply_markup=reply_markup
+        context.user_data["final_post"] = text
+        await update.message.reply_text(
+            "✅ *Post güncellendi!*",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=post_actions(),
         )
+        return
+
+    # URL veya airdrop adı
+    await _do_research(update, context, text)
+
+
+async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input_text: str):
+    """Derin araştırma → AI analiz → Post oluştur."""
+    msg = await update.effective_message.reply_text(
+        "🔬 *Derin araştırma başlıyor...*\n\n"
+        f"📌 Girdi: `{input_text[:80]}`\n\n"
+        "_Bu işlem 20-40 saniye sürebilir..._",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    await update.effective_chat.send_action(ChatAction.TYPING)
+
+    # 1. Araştır
+    if is_url(input_text):
+        await msg.edit_text("🔗 *URL içeriği çekiliyor...*", parse_mode=ParseMode.MARKDOWN)
+        data = research_airdrop_by_url(input_text)
     else:
-        # Genel sohbet - AI ile yanıtla
-        system = "Sen bir kripto ve airdrop asistanısın. Kısa ve bilgilendirici yanıtlar ver. Türkçe konuş."
-        response = groq_generate(system, text, max_tokens=500)
-        await update.message.reply_text(response, parse_mode="Markdown")
-
-
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Inline buton callback işleyici"""
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    
-    if data == "scan_airdrops":
-        await query.message.reply_text("🔍 Tarama başlatılıyor...")
-        
-        msg = await query.message.reply_text("🔍 Airdroplar aranıyor...")
-        results = search_airdrops()
-        
-        await msg.edit_text("🤖 AI analizi yapılıyor...")
-        analysis = analyze_airdrops_with_ai(results)
-        context.user_data["last_scan"] = analysis
-        
-        keyboard = [
-            [InlineKeyboardButton("📝 Post Oluştur", callback_data="create_post_from_scan")],
-            [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan_airdrops")]
-        ]
-        
         await msg.edit_text(
-            f"✅ *TARAMA TAMAMLANDI*\n\n{analysis}",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            f"🔍 *'{input_text}' için derin arama yapılıyor...*\n_3 farklı sorgu çalışıyor..._",
+            parse_mode=ParseMode.MARKDOWN,
         )
-    
-    elif data == "create_post":
-        context.user_data["waiting_for"] = "post_details"
-        await query.message.reply_text(
-            "✍️ Post oluşturmak istediğiniz platform veya airdrop hakkında bilgi yazın:\n\n"
-            "Örnek: *'Arbitrum airdrop, 3000 ARB ödül, görev: bridge kullan, son tarih: 31 Ocak'*",
-            parse_mode="Markdown"
-        )
-    
-    elif data == "create_post_from_scan":
-        last_scan = context.user_data.get("last_scan", "")
-        if last_scan:
-            msg = await query.message.reply_text("✍️ Post hazırlanıyor...")
-            post_content = format_airdrop_post(last_scan)
-            context.user_data["last_post"] = post_content
-            
-            keyboard = [
-                [InlineKeyboardButton("📢 Gruba Gönder", callback_data="send_to_group")],
-                [InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_with_image")]
-            ]
-            
-            await msg.edit_text(
-                f"✅ *POST HAZIR!*\n\n{post_content}\n\n"
-                "⚠️ `[🔗 KATILIM LİNKİ BURAYA]` kısmına referans linkinizi ekleyin!",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-    
-    elif data == "send_to_group":
-        if update.effective_user.id != ADMIN_CHAT_ID:
-            await query.message.reply_text("⛔ Sadece admin gruba gönderebilir.")
-            return
-        
-        last_post = context.user_data.get("last_post")
-        if not last_post:
-            await query.message.reply_text("⚠️ Önce bir post oluşturun!")
-            return
-        
-        try:
-            await context.bot.send_message(
-                chat_id=GROUP_CHAT_ID,
-                text=last_post,
-                parse_mode="Markdown"
-            )
-            await query.message.reply_text("✅ Post gruba başarıyla gönderildi!")
-        except Exception as e:
-            await query.message.reply_text(f"❌ Hata: {e}")
-    
-    elif data == "send_with_image":
-        if update.effective_user.id != ADMIN_CHAT_ID:
-            await query.message.reply_text("⛔ Sadece admin gruba gönderebilir.")
-            return
-        
-        last_post = context.user_data.get("last_post")
-        platform = context.user_data.get("last_post_platform", "cryptocurrency airdrop")
-        
-        if not last_post:
-            await query.message.reply_text("⚠️ Önce bir post oluşturun!")
-            return
-        
-        msg = await query.message.reply_text("🖼️ Görsel alınıyor...")
-        image_url = get_unsplash_image(f"{platform} crypto blockchain")
-        
-        try:
-            if image_url:
+        data = research_airdrop_by_name(input_text)
+
+    project_name = data.get("name", input_text)
+
+    # 2. Analiz et
+    await msg.edit_text("🤖 *AI analizi yapılıyor...*", parse_mode=ParseMode.MARKDOWN)
+    analysis = analyze_research(data)
+    context.user_data["last_analysis"] = analysis
+    context.user_data["last_project"] = project_name
+
+    # 3. Post oluştur
+    await msg.edit_text("✍️ *Telegram postu yazılıyor...*", parse_mode=ParseMode.MARKDOWN)
+    post = build_post(analysis, project_name)
+    context.user_data["last_post"] = post
+    context.user_data["final_post"] = post
+    context.user_data["last_post_platform"] = project_name
+
+    # 4. Analizi göster
+    analysis_msg = (
+        f"📊 *ARAŞTIRMA RAPORU — {project_name.upper()}*\n\n"
+        f"{safe_md(analysis)}"
+    )
+
+    # Uzun ise böl
+    if len(analysis_msg) > 4000:
+        analysis_msg = analysis_msg[:3990] + "\n_...devamı kırpıldı_"
+
+    await msg.edit_text(analysis_msg, parse_mode=ParseMode.MARKDOWN)
+
+    # 5. Postu göster
+    post_preview = (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📣 *HAZIRLANAN POST:*\n\n"
+        f"{safe_md(post)}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚠️ _\\[🔗 REFERANS LİNKİ BURAYA\\] yerine kendi linkini ekle, ardından gruba gönder._"
+    )
+
+    if len(post_preview) > 4096:
+        post_preview = post_preview[:4086] + "_"
+
+    await update.effective_message.reply_text(
+        post_preview,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=post_actions(),
+    )
+
+# ══════════════════════════════════════════════════════════
+#  GRUBA GÖNDERME
+# ══════════════════════════════════════════════════════════
+
+async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, with_photo: bool):
+    post = context.user_data.get("final_post") or context.user_data.get("last_post")
+    if not post:
+        target = update.callback_query.message if update.callback_query else update.message
+        await target.reply_text("⚠️ Önce bir post oluştur!")
+        return
+
+    platform = context.user_data.get("last_post_platform", "cryptocurrency airdrop")
+
+    try:
+        if with_photo:
+            img_url = get_image(f"{platform} crypto blockchain token")
+            caption = post[:1020] if len(post) > 1020 else post
+            if img_url:
                 await context.bot.send_photo(
                     chat_id=GROUP_CHAT_ID,
-                    photo=image_url,
-                    caption=last_post[:1024],  # Telegram caption limiti
-                    parse_mode="Markdown"
+                    photo=img_url,
+                    caption=safe_md(caption),
+                    parse_mode=ParseMode.MARKDOWN,
                 )
-                await msg.edit_text("✅ Görsel ile post gruba gönderildi!")
             else:
                 await context.bot.send_message(
                     chat_id=GROUP_CHAT_ID,
-                    text=last_post,
-                    parse_mode="Markdown"
+                    text=safe_md(post),
+                    parse_mode=ParseMode.MARKDOWN,
                 )
-                await msg.edit_text("✅ Post gönderildi (görsel bulunamadı).")
-        except Exception as e:
-            await msg.edit_text(f"❌ Hata: {e}")
-    
+        else:
+            await context.bot.send_message(
+                chat_id=GROUP_CHAT_ID,
+                text=safe_md(post),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
+        confirm = "✅ *Post gruba gönderildi!*" + (" 🖼️ (görsel ile)" if with_photo else "")
+        target = update.callback_query.message if update.callback_query else update.message
+        await target.reply_text(confirm, parse_mode=ParseMode.MARKDOWN, reply_markup=main_menu())
+
+    except Exception as e:
+        logger.error(f"Gönderme hatası: {e}")
+        target = update.callback_query.message if update.callback_query else update.message
+        await target.reply_text(f"❌ Gönderim hatası: `{e}`", parse_mode=ParseMode.MARKDOWN)
+
+# ══════════════════════════════════════════════════════════
+#  CALLBACK BUTONLAR
+# ══════════════════════════════════════════════════════════
+
+@admin_only_callback
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    data = q.data
+
+    if data == "home":
+        await q.message.reply_text(
+            "🏠 *Ana Menü*",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu(),
+        )
+
     elif data == "help":
-        await help_command(query, context)
+        await q.message.reply_text(
+            "📖 *KOMUTLAR*\n\n"
+            "/scan — Aktif airdropları tara\n"
+            "/post `[isim]` — Araştır & post oluştur\n"
+            "/sendgroup — Son postu gruba gönder\n\n"
+            "💡 Direkt airdrop adı veya link yazabilirsin.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
 
+    elif data == "scan":
+        msg = await q.message.reply_text(
+            "🌐 *İnternet taranıyor...*\n_20-30 saniye sürebilir_",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        result = scan_active_airdrops()
+        context.user_data["last_scan"] = result
 
-# ─────────────────────────────────────────────
-# OTOMATIK TARAMA (Scheduler)
-# ─────────────────────────────────────────────
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
+            [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan"),
+             InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
+        ])
+        text = f"✅ *TARAMA TAMAMLANDI*\n\n{safe_md(result)}"
+        if len(text) > 4096:
+            text = text[:4086] + "_"
+        await msg.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+    elif data == "manual_post":
+        context.user_data["waiting_for"] = None
+        await q.message.reply_text(
+            "✍️ *Manuel Araştırma*\n\n"
+            "Aşağıdakilerden birini yaz:\n"
+            "• Airdrop / proje adı\n"
+            "• Airdrop URL'si\n\n"
+            "_Örnek: `Arbitrum` veya `https://arbitrum.io/airdrop`_",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    elif data == "send_text":
+        await _send_to_group(update, context, with_photo=False)
+
+    elif data == "send_photo":
+        await q.message.reply_text("🖼️ Görsel aranıyor...", parse_mode=ParseMode.MARKDOWN)
+        await _send_to_group(update, context, with_photo=True)
+
+    elif data == "regen_post":
+        analysis = context.user_data.get("last_analysis")
+        project  = context.user_data.get("last_project", "")
+        if not analysis:
+            await q.message.reply_text("⚠️ Yenilemek için önce bir araştırma yap.")
+            return
+        msg = await q.message.reply_text("♻️ *Post yeniden yazılıyor...*", parse_mode=ParseMode.MARKDOWN)
+        post = build_post(analysis, project)
+        context.user_data["last_post"]   = post
+        context.user_data["final_post"]  = post
+        preview = f"📣 *YENİLENEN POST:*\n\n{safe_md(post)}\n\n⚠️ _Referans linkini ekle, ardından gönder._"
+        if len(preview) > 4096:
+            preview = preview[:4086] + "_"
+        await msg.edit_text(preview, parse_mode=ParseMode.MARKDOWN, reply_markup=post_actions())
+
+    elif data == "new_research":
+        context.user_data["waiting_for"] = None
+        await q.message.reply_text(
+            "🔬 *Yeni araştırma için airdrop adı veya linkini yaz:*",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+# ══════════════════════════════════════════════════════════
+#  OTOMATİK TARAMA — Her 8 Saatte Bir Admin'e Bildir
+# ══════════════════════════════════════════════════════════
 
 async def auto_scan_job(context: ContextTypes.DEFAULT_TYPE):
-    """Otomatik periyodik airdrop taraması"""
     logger.info("Otomatik tarama başladı...")
-    
-    results = search_airdrops("new crypto airdrop today 2025 claim free tokens")
-    if results:
-        analysis = analyze_airdrops_with_ai(results)
-        
-        try:
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=f"🔔 *OTOMATİK TARAMA RAPORU*\n_{datetime.now().strftime('%d.%m.%Y %H:%M')}_\n\n{analysis}",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Auto scan bildirim hatası: {e}")
+    result = scan_active_airdrops()
+    ts = datetime.now().strftime("%d.%m.%Y %H:%M")
 
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
+    ])
 
-# ─────────────────────────────────────────────
-# ANA FONKSİYON
-# ─────────────────────────────────────────────
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=f"🔔 *OTOMATİK TARAMA* — _{ts}_\n\n{safe_md(result)}",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard,
+        )
+    except Exception as e:
+        logger.error(f"Auto scan bildirim hata: {e}")
+
+# ══════════════════════════════════════════════════════════
+#  ANA
+# ══════════════════════════════════════════════════════════
 
 def main():
-    """Botu başlat"""
     app = Application.builder().token(BOT_TOKEN).build()
-    
-    # Komut handler'ları
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("scan", scan_command))
-    app.add_handler(CommandHandler("post", post_command))
-    app.add_handler(CommandHandler("createpost", createpost_command))
-    app.add_handler(CommandHandler("sendgroup", sendgroup_command))
-    
-    # Buton callback handler
-    app.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Mesaj handler
+
+    app.add_handler(CommandHandler("start",     cmd_start))
+    app.add_handler(CommandHandler("help",      cmd_help))
+    app.add_handler(CommandHandler("scan",      cmd_scan))
+    app.add_handler(CommandHandler("post",      cmd_post))
+    app.add_handler(CommandHandler("sendgroup", cmd_sendgroup))
+
+    app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # Otomatik tarama - her 6 saatte bir
-    job_queue = app.job_queue
-    job_queue.run_repeating(auto_scan_job, interval=21600, first=60)
-    
-    logger.info("🚀 Airdrop Bot başlatıldı!")
+
+    # Otomatik tarama: 8 saatte bir
+    app.job_queue.run_repeating(auto_scan_job, interval=28800, first=120)
+
+    logger.info("🚀 Airdrop Bot başlatıldı.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

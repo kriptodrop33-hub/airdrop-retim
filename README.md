@@ -1,58 +1,77 @@
-# 🚀 Airdrop Telegram Bot
+# 🚀 Airdrop Bot v2 — Gelişmiş Admin Paneli
 
-## Özellikler
-- 🔍 **Airdrop Tarama**: Tavily API ile interneti tarayarak aktif airdropları bulur
-- 🤖 **AI Analiz**: Groq (LLaMA 70B) ile bulunan airdropları analiz eder
-- ✍️ **Post Oluşturma**: Platform/airdrop adı verince otomatik Telegram postu hazırlar
-- 🖼️ **Görsel**: Unsplash'tan otomatik kripto görseli ekler
-- 📢 **Gruba Gönder**: Hazırlanan postları tek tıkla gruba gönderir
-- ⏰ **Otomatik Tarama**: Her 6 saatte bir admin'e yeni airdrop raporu gönderir
+## ✨ Yeni Özellikler
+
+### 🔒 Admin-Only DM
+Bot yalnızca `ADMIN_CHAT_ID` sahibinin özel mesajında çalışır. Grup veya yabancıların erişimi tamamen engellenir.
+
+### 🔬 Derin Araştırma
+- **Airdrop adı yazınca:** 3 farklı Tavily sorgusu, 10+ kaynak, AI analizi
+- **URL atınca:** Sayfa içeriği çekilir + ek araştırma yapılır, proje adı otomatik tespit edilir
+
+### 📣 Emoji'li Güzel Postlar
+Sabit şablon ile her post tutarlı ve dikkat çekici görünür:
+```
+🚨 *PROJE AİRDROP* 🚨
+━━━━━━━━━━━━━━━━━━━━
+🏆 ÖDÜL | ⛓ ZİNCİR | 👥 UYGUNLUK
+━━━━━━━━━━━━━━━━━━━━
+📋 GÖREVLER (✅ listesi)
+⏰ SON TARİH
+🔗 REFERANS LİNKİ BURAYA
+#Airdrop #Kripto
+```
+
+### ⏰ Otomatik Tarama
+Her 8 saatte bir interneti tarayıp admin'e aktif airdrop listesi gönderir.
 
 ---
 
-## Railway Kurulum
-
-### 1. Environment Variables (Zaten ayarlandı)
-```
-BOT_TOKEN=your_telegram_bot_token
-GROQ_API_KEY=your_groq_api_key
-TAVILY_API_KEY=your_tavily_api_key
-UNSPLASH_ACCESS_KEY=your_unsplash_key
-ADMIN_CHAT_ID=your_telegram_user_id
-GROUP_CHAT_ID=your_group_chat_id
-```
-
-### 2. Deploy
-- `bot.py`, `requirements.txt`, `Procfile` dosyalarını Railway'e yükle
-- Railway otomatik deploy eder
-
----
-
-## Komutlar
+## 📋 Komutlar
 
 | Komut | Açıklama |
 |-------|----------|
 | `/start` | Ana menü |
-| `/scan` | Genel airdrop taraması |
-| `/scan Solana` | Belirli konu taraması |
-| `/post Arbitrum` | Platform için hızlı post |
-| `/createpost` | Detaylı bilgi ile post |
+| `/scan` | İnterneti tara, aktif airdropları listele |
+| `/post Arbitrum` | İsme göre derin araştır & post oluştur |
 | `/sendgroup` | Son postu gruba gönder |
-| `/help` | Yardım |
+| `/help` | Komut listesi |
+
+**Direkt mesaj:**
+- `Arbitrum` → derin araştırma başlar
+- `https://arbitrum.io/airdrop` → URL'den araştırma
 
 ---
 
-## Kullanım Akışı
+## 🔄 Kullanım Akışı
 
-1. `/scan` ile airdropları tara
-2. İlgini çeken airdrop için `/post [isim]` yaz
-3. Post hazırlanır, `[🔗 KATILIM LİNKİ BURAYA]` yerine kendi referans linkini ekle
-4. `/sendgroup` veya "Gruba Gönder" butonuna bas
+```
+1. /post [isim] veya direkt airdrop adı yaz
+      ↓
+2. Bot araştırır (20-40 sn)
+      ↓
+3. Araştırma raporu gösterilir
+      ↓
+4. Otomatik post hazırlanır
+      ↓
+5. [🔗 REFERANS LİNKİ BURAYA] → kendi linkini yapıştır
+      ↓
+6. "Gruba Gönder" butonuna bas ✅
+```
 
 ---
 
-## ADMIN_CHAT_ID Nasıl Bulunur?
-Telegram'da @userinfobot'a mesaj at, ID'ni verir.
+## ⚙️ Railway Değişkenler
 
-## GROUP_CHAT_ID Nasıl Bulunur?
-Botu gruba ekle, ardından @getidsbot'u da gruba ekle, group ID'yi verir.
+```
+BOT_TOKEN           = Telegram bot token
+GROQ_API_KEY        = Groq API key (llama-3.3-70b)
+TAVILY_API_KEY      = Tavily search API key
+UNSPLASH_ACCESS_KEY = Unsplash API key
+ADMIN_CHAT_ID       = Kendi Telegram user ID'n
+GROUP_CHAT_ID       = Grubun chat ID'si (negatif sayı)
+```
+
+## 📌 ID Alma
+- **ADMIN_CHAT_ID:** @userinfobot'a mesaj at
+- **GROUP_CHAT_ID:** Botu gruba ekle, @getidsbot'u gruba ekle
