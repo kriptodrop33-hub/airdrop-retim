@@ -144,14 +144,15 @@ def get_image(query: str = "cryptocurrency airdrop") -> str | None:
 
 def research_airdrop_by_name(name: str) -> dict:
     """
-    Airdrop adına göre derin araştırma:
-    - 3 farklı arama sorgusu
-    - AI ile kapsamlı analiz
+    Platform/proje adına göre derin araştırma.
+    Borsa bonusu, airdrop, kampanya — her türü kapsar.
     """
     queries = [
-        f"{name} airdrop how to claim eligibility 2025",
-        f"{name} token airdrop rewards tasks deadline",
-        f"{name} crypto project tokenomics community airdrop guide",
+        f"{name} yeni kullanıcı bonusu kayıt ödülü nasıl alınır 2025 2026",
+        f"{name} new user bonus sign up reward how to claim 2025 2026",
+        f"{name} airdrop campaign tasks eligibility reward amount",
+        f"{name} referral program bonus USDT earn invite",
+        f"{name} crypto promotion trading reward deposit bonus",
     ]
     all_results = []
     for q in queries:
@@ -166,12 +167,23 @@ def research_airdrop_by_name(name: str) -> dict:
             seen_urls.add(url)
             unique.append(item)
 
+    # Uzun içerik — 1200 karakter/kaynak
     raw_text = "\n\n".join([
-        f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:500]}"
-        for i, r in enumerate(unique[:10])
+        f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:1200]}"
+        for i, r in enumerate(unique[:12])
     ])
 
-    return {"name": name, "raw": raw_text, "sources": unique[:10]}
+    # En alakalı sayfanın tam içeriğini de çek
+    if unique:
+        best_url = unique[0].get("url", "")
+        try:
+            full = fetch_url_content(best_url)
+            if full:
+                raw_text = f"=== TAM SAYFA İÇERİĞİ ({best_url}) ===\n{full[:3000]}\n\n=== DİĞER KAYNAKLAR ===\n{raw_text}"
+        except Exception:
+            pass
+
+    return {"name": name, "raw": raw_text, "sources": unique[:12]}
 
 
 def research_airdrop_by_url(url: str) -> dict:
@@ -200,23 +212,30 @@ def research_airdrop_by_url(url: str) -> dict:
 
 
 def analyze_research(data: dict) -> str:
-    """AI ile araştırma verisini analiz et."""
-    system = """Sen deneyimli bir kripto airdrop araştırmacısısın.
-Verilen ham veriyi analiz edip şu başlıkları doldur:
+    """AI ile araştırma verisini analiz et — sadece belgeli bilgileri yaz."""
+    system = """Sen deneyimli bir kripto kazanım fırsatı araştırmacısısın.
+Görevin: Verilen HAM VERİDEN gerçek bilgileri çıkarmak.
 
-PROJE HAKKINDA: (2-3 cümle özet)
-TOKEN BİLGİSİ: (sembol, zincir, toplam arz varsa)
-AIRDROP ÖDÜLÜ: (miktarı, değeri varsa)
-UYGUNLUK KOŞULLARI: (kimler alabilir)
-GÖREVLER: (adım adım liste)
+KRİTİK KURAL: Sadece ham veride AÇIKÇA geçen bilgileri yaz.
+Rakamlar, tarihler, adımlar — hepsini KAYNAK VERİDEN al.
+Eğer ham veride geçmiyorsa o alanı "Bulunamadı" yaz — ASLA uydurma.
+
+ÇIKART:
+PLATFORM/PROJE: (adı ve ne olduğu)
+FIRSATIN TÜRÜ: (borsa bonusu / airdrop / kampanya / referral — hangisi?)
+ÖDÜL MİKTARI: (varsa EXACT rakam — "60.000 USDT" değil, kaynakta ne yazıyorsa)
+KİMLER KATILABİLİR: (yeni kullanıcı / mevcut / herkes)
+ADIMLAR: (kaynakta yazan GERÇEK adımlar, numaralı)
+  → Her adımın ödülü varsa onu da yaz
+TOPLAM KAZANILABİLİR: (varsa)
 SON TARİH: (varsa)
-KATILIM LİNKİ: (varsa bul)
-RİSK SKORU: (Düşük / Orta / Yüksek) + kısa gerekçe
-GÜVENİLİRLİK: ⭐⭐⭐⭐⭐ (1-5 yıldız)
+KATILABİLECEK LİNK: (varsa ham veride geçen URL)
+GÜVENİLİRLİK: ⭐⭐⭐⭐⭐ (tanınan borsa/proje ise yüksek)
+UYARI: (varsa dikkat edilmesi gereken şey — min yatırım, KYC zorunluluğu vb.)
 
-Eğer bilgi yoksa "Bilinmiyor" yaz. Türkçe yaz."""
+Türkçe yaz. Uydurma yapma — yoksa "Bulunamadı" yaz."""
 
-    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=1500)
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
@@ -377,12 +396,17 @@ KURAL:
 ⚡ _Fırsatı kaçırma!_"""
 
 def build_post(analysis: str, project_name: str) -> str:
-    return ai(
-        POST_SYSTEM,
-        f"Proje: {project_name}\n\nAraştırma analizi:\n{analysis}",
-        tokens=900,
-        temp=0.8,
+    prompt = (
+        f"Platform/Proje: {project_name}\n\n"
+        f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
+        f"=== TALİMAT ===\n"
+        f"Yukarıdaki ANALİZ VERİSİNİ kullanarak post oluştur.\n"
+        f"SADECE analizde geçen rakam ve bilgileri kullan.\n"
+        f"Analizde olmayan hiçbir rakam veya bilgi EKLEME.\n"
+        f"Ödül miktarı 'Bulunamadı' ise post şablonunda o satırı kaldır.\n"
+        f"Adımlar analizden gelecek — uydurma."
     )
+    return ai(POST_SYSTEM, prompt, tokens=1000, temp=0.5)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -525,25 +549,53 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if waiting == "add_link":
         context.user_data["waiting_for"] = None
         post = context.user_data.get("last_post", "")
-        # [🔗 LİNK] placeholder'ını gerçek linkle değiştir
-        updated = post.replace("[🔗 LİNK]", text.strip())
+        link = text.strip()
+        updated = post.replace("[🔗 LİNK]", link)
         context.user_data["final_post"] = updated
         context.user_data["has_link"] = True
-        preview = (
-            f"✅ *Link eklendi!*\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"📣 *GÜNCEL POST:*\n\n"
-            f"{safe_md(updated)}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Hazır! Gruba gönderebilirsin."
-        )
-        if len(preview) > 4096:
-            preview = preview[:4086] + "_"
+
+        # Görsel çek ve DM'de önizle
+        platform = context.user_data.get("last_post_platform", "crypto")
         await update.message.reply_text(
-            preview,
+            "✅ *Link eklendi!* Görsel aranıyor...",
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=post_actions(has_link=True),
         )
+        img_url = get_image(f"{platform} crypto")
+        caption = safe_md(updated[:1024] if len(updated) > 1024 else updated)
+
+        if img_url:
+            try:
+                await update.message.reply_photo(
+                    photo=img_url,
+                    caption=caption,
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=post_actions(has_link=True),
+                )
+            except Exception:
+                # Görsel gönderilemezse metin olarak göster
+                preview = (
+                    f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
+                    f"Hazır! Gruba gönderebilirsin."
+                )
+                if len(preview) > 4096:
+                    preview = preview[:4086] + "_"
+                await update.message.reply_text(
+                    preview,
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=post_actions(has_link=True),
+                )
+        else:
+            preview = (
+                f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
+                f"Hazır! Gruba gönderebilirsin."
+            )
+            if len(preview) > 4096:
+                preview = preview[:4086] + "_"
+            await update.message.reply_text(
+                preview,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=post_actions(has_link=True),
+            )
         return
 
     # Post düzenleme (eski compat)
