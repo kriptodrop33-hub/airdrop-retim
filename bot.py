@@ -32,6 +32,67 @@ UNSPLASH_ACCESS_KEY = os.environ["UNSPLASH_ACCESS_KEY"]
 ADMIN_CHAT_ID       = int(os.environ["ADMIN_CHAT_ID"])
 GROUP_CHAT_ID       = int(os.environ["GROUP_CHAT_ID"])
 
+# ── Kayıt Linki Takip Sistemi ─────────────────────────────────────────
+import hashlib as _hashlib, time as _time, random as _random
+
+_LINK_STORE: dict = {}   # {"LINK_ID": {...meta...}}
+
+def _gen_link_id() -> str:
+    lid = _hashlib.md5(str(_random.random()).encode()).hexdigest()[:6].upper()
+    return lid if lid not in _LINK_STORE else _gen_link_id()
+
+def register_link(original_url: str, platform: str, category: str = "genel") -> dict:
+    """Yeni link kaydı oluştur."""
+    lid = _gen_link_id()
+    _LINK_STORE[lid] = {
+        "id":       lid,
+        "url":      original_url,
+        "platform": platform,
+        "category": category,
+        "created":  _time.strftime("%d.%m.%Y %H:%M"),
+        "clicks":   0,
+        "posts":    0,   # kaç posta eklendi
+    }
+    return _LINK_STORE[lid]
+
+def record_post_use(link_id: str):
+    """Link bir posta eklenince sayacı artır."""
+    if link_id in _LINK_STORE:
+        _LINK_STORE[link_id]["posts"] += 1
+
+def get_link_stats() -> str:
+    """Admin için istatistik özeti."""
+    if not _LINK_STORE:
+        return "📊 Henüz kayıtlı link yok.\n/link_ekle komutuyla link ekleyebilirsin."
+    lines = ["📊 *KAYIT LİNKİ İSTATİSTİKLERİ*\n━━━━━━━━━━━━━━━━━━━━"]
+    sorted_links = sorted(_LINK_STORE.values(), key=lambda x: x["posts"], reverse=True)
+    for lnk in sorted_links[:10]:
+        short_url = lnk["url"][:45] + ("..." if len(lnk["url"]) > 45 else "")
+        lines.append(
+            f"🔗 *{lnk['platform']}* `[{lnk['id']}]`\n"
+            f"   📤 {lnk['posts']} posta eklendi | 📅 {lnk['created']}\n"
+            f"   🌐 `{short_url}`"
+        )
+    return "\n\n".join(lines)
+
+def get_link_list_menu() -> InlineKeyboardMarkup:
+    """Kayıtlı linkleri buton olarak göster."""
+    if not _LINK_STORE:
+        return InlineKeyboardMarkup([[
+            InlineKeyboardButton("➕ Yeni Link Ekle", callback_data="link_add_new"),
+            InlineKeyboardButton("🏠 Ana Menü", callback_data="home"),
+        ]])
+    rows = []
+    for lnk in list(_LINK_STORE.values())[-8:]:  # son 8 link
+        label = f"[{lnk['id']}] {lnk['platform']} ({lnk['posts']} post)"
+        rows.append([InlineKeyboardButton(label, callback_data=f"link_use_{lnk['id']}")])
+    rows.append([
+        InlineKeyboardButton("➕ Yeni Link Ekle", callback_data="link_add_new"),
+        InlineKeyboardButton("🗑️ Temizle", callback_data="link_clear"),
+    ])
+    rows.append([InlineKeyboardButton("🏠 Ana Menü", callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 
@@ -262,18 +323,47 @@ OPPORTUNITY_QUERIES = [
 ]
 
 
-def run_opportunity_search() -> list[dict]:
-    """Tüm kategorilerde Tavily araması, uzun içerik çeker."""
+# Kategori tanımları — kullanıcıya gösterilen label ve filtre key'i
+CATEGORY_DEFS = {
+    "hepsi":    ("🌐 Hepsi",          None),           # filtre yok
+    "bonus":    ("🎁 Borsa Bonusu",   ["bonus"]),
+    "referral": ("👥 Referral",       ["referral"]),
+    "kampanya": ("🏆 Kampanya",       ["kampanya"]),
+    "sosyal":   ("📱 Sosyal Görev",   ["sosyal"]),
+    "airdrop":  ("🪂 Airdrop",        ["airdrop"]),
+}
+
+
+def category_filter_menu() -> InlineKeyboardMarkup:
+    """Tarama öncesi kategori seçim menüsü."""
+    rows = []
+    keys = list(CATEGORY_DEFS.keys())
+    for i in range(0, len(keys), 3):
+        row = []
+        for k in keys[i:i+3]:
+            label, _ = CATEGORY_DEFS[k]
+            row.append(InlineKeyboardButton(label, callback_data=f"cat_{k}"))
+        rows.append(row)
+    rows.append([InlineKeyboardButton("🏠 Ana Menü", callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
+
+def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
+    """
+    Tavily araması — cats verilirse sadece o kategorileri tara.
+    cats=None → hepsi
+    """
     seen_urls = set()
     results = []
     for category, query in OPPORTUNITY_QUERIES:
+        if cats and category not in cats:
+            continue
         hits = deep_search(query, max_results=4)
         for r in hits:
             url = r.get("url", "")
             if url in seen_urls:
                 continue
             seen_urls.add(url)
-            # Her sonuçtan 1200 karakter al — AI için zengin veri
             results.append({
                 "category": category,
                 "title":    r.get("title", ""),
@@ -283,12 +373,12 @@ def run_opportunity_search() -> list[dict]:
     return results
 
 
-def scan_active_airdrops() -> str:
+def scan_active_airdrops(cats: list[str] | None = None) -> str:
     """
     Kripto kazanım fırsatı tarayıcısı.
-    Odak: borsa kayıt bonusu, referral, kampanya, Telegram görevi, airdrop.
+    cats=None → tüm kategoriler
     """
-    raw_results = run_opportunity_search()
+    raw_results = run_opportunity_search(cats=cats)
 
     if not raw_results:
         return "❌ Veri çekilemedi. Lütfen tekrar deneyin."
@@ -400,18 +490,59 @@ KURAL:
 
 _⚡ Bu fırsatı kaçırma — arkadaşlarınla da paylaş!_"""
 
-def build_post(analysis: str, project_name: str) -> str:
-    prompt = (
+# ── Post sistem promptları ─────────────────────────────────────────────
+
+POST_SYSTEM_SHORT = """Sen Telegram için KISA ve öz kripto fırsat postları yazıyorsun.
+KURAL:
+- Türkçe, normal Markdown (*bold*, _italic_)
+- Hashtag (#) KULLANMA
+- Maksimum 400 karakter — kısa tut
+- Link için: [🔗 LİNK]
+- Sadece analizde geçen gerçek rakamları kullan
+
+ŞABLON:
+💥 *[PLATFORM] — [BAŞLIK]*
+
+💰 *Ödül:* [rakam]
+✅ [en önemli 1-2 adım]
+
+👉 [🔗 LİNK]
+_⚡ Hızlı ol!_"""
+
+POST_SYSTEM_SUMMARY = """Sen Telegram için tek satır kripto fırsat özeti yazıyorsun.
+KURAL:
+- Türkçe
+- Tek mesaj, 1-3 satır MAX
+- Hashtag (#) KULLANMA
+- Link için: [🔗 LİNK]
+- Sadece analizde geçen gerçek rakamları kullan
+
+FORMAT:
+🎁 *[PLATFORM]* — [ödül miktarı] kazan! [1 cümle nasıl]. 👉 [🔗 LİNK]"""
+
+
+def _build_prompt(analysis: str, project_name: str) -> str:
+    return (
         f"Platform/Proje: {project_name}\n\n"
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
         f"=== TALİMAT ===\n"
         f"Yukarıdaki ANALİZ VERİSİNİ kullanarak post oluştur.\n"
-        f"SADECE analizde geçen rakam ve bilgileri kullan.\n"
-        f"Analizde olmayan hiçbir rakam veya bilgi EKLEME.\n"
-        f"Ödül miktarı 'Bulunamadı' ise post şablonunda o satırı kaldır.\n"
-        f"Adımlar analizden gelecek — uydurma."
+        f"SADECE analizde geçen rakam ve bilgileri kullan — uydurma yapma.\n"
+        f"Ödül miktarı bulunamadıysa o satırı kaldır."
     )
-    return ai(POST_SYSTEM, prompt, tokens=1000, temp=0.5)
+
+
+def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
+    """
+    fmt: "long" | "short" | "summary"
+    """
+    prompt = _build_prompt(analysis, project_name)
+    if fmt == "short":
+        return ai(POST_SYSTEM_SHORT, prompt, tokens=450, temp=0.5)
+    elif fmt == "summary":
+        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.5)
+    else:
+        return ai(POST_SYSTEM, prompt, tokens=1000, temp=0.5)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -419,21 +550,28 @@ def build_post(analysis: str, project_name: str) -> str:
 
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 Airdrop Tara", callback_data="scan"),
+        [InlineKeyboardButton("🔍 Fırsat Tara", callback_data="scan_menu"),
          InlineKeyboardButton("✍️ Post Oluştur", callback_data="manual_post")],
-        [InlineKeyboardButton("📢 Gruba Gönder (Metin)", callback_data="send_text"),
-         InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_photo")],
+        [InlineKeyboardButton("📊 Link İstatistik", callback_data="link_stats"),
+         InlineKeyboardButton("🔗 Linklerimi Yönet", callback_data="link_manage")],
         [InlineKeyboardButton("🔄 Yeni Araştırma", callback_data="new_research"),
          InlineKeyboardButton("❓ Yardım", callback_data="help")],
     ])
 
-def post_actions(has_link: bool = False) -> InlineKeyboardMarkup:
+def post_actions(has_link: bool = False, fmt: str = "long") -> InlineKeyboardMarkup:
     link_btn_label = "✅ Link Eklendi" if has_link else "🔗 Link Ekle"
+    # Format butonları — aktif olan kalın gösterilemez ama emoji ile vurgulanır
+    fmt_long    = "📄 Uzun ●" if fmt == "long"    else "📄 Uzun"
+    fmt_short   = "📝 Kısa ●" if fmt == "short"   else "📝 Kısa"
+    fmt_summary = "⚡ Özet ●" if fmt == "summary" else "⚡ Özet"
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton(fmt_long,    callback_data="fmt_long"),
+         InlineKeyboardButton(fmt_short,   callback_data="fmt_short"),
+         InlineKeyboardButton(fmt_summary, callback_data="fmt_summary")],
         [InlineKeyboardButton(link_btn_label, callback_data="add_link")],
         [InlineKeyboardButton("📢 Gruba Gönder (Metin)", callback_data="send_text"),
          InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_photo")],
-        [InlineKeyboardButton("♻️ Postu Yenile", callback_data="regen_post"),
+        [InlineKeyboardButton("♻️ Yenile", callback_data="regen_post"),
          InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
     ])
 
@@ -500,25 +638,11 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @admin_only
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text(
-        "🌐 *Taranıyor...*\n_Airdrop, borsa bonusu, kampanya, testnet ödülü aranıyor (30-50 sn)_",
+    await update.message.reply_text(
+        "🔍 *Hangi kategoriyi tarayalım?*\n\n"
+        "_Hepsi → tüm kategoriler taranır (daha uzun sürer)_",
         parse_mode=ParseMode.MARKDOWN,
-    )
-    await update.effective_chat.send_action(ChatAction.TYPING)
-
-    result = scan_active_airdrops()
-    context.user_data["last_scan"] = result
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
-        [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan"),
-         InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
-    ])
-
-    await msg.edit_text(
-        f"✅ *FIRSATLAR TARANDII*\n\n{safe_md(result)}",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=keyboard,
+        reply_markup=category_filter_menu(),
     )
 
 @admin_only
@@ -549,6 +673,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     text = update.message.text.strip()
     waiting = context.user_data.get("waiting_for")
+
+    # Yeni kayıt linki ekleme state
+    if waiting == "link_add":
+        context.user_data["waiting_for"] = None
+        parts = [p.strip() for p in text.split("|", 1)]
+        if len(parts) != 2 or not parts[1].startswith("http"):
+            await update.message.reply_text(
+                "⚠️ Format hatalı. Şöyle yaz:\n"
+                "`PLATFORM_ADI | https://link.com`",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+        platform_name, url = parts
+        lnk = register_link(url, platform_name)
+        await update.message.reply_text(
+            f"✅ *Link kaydedildi!*\n\n"
+            f"🔑 ID: `{lnk['id']}`\n"
+            f"🏦 Platform: *{lnk['platform']}*\n"
+            f"🌐 URL: `{lnk['url'][:60]}`\n\n"
+            f"Artık *🔗 Linklerimi Yönet* menüsünden postlara ekleyebilirsin.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu(),
+        )
+        return
 
     # Link ekleme state
     if waiting == "add_link":
@@ -678,11 +826,12 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     if len(post_preview) > 4096:
         post_preview = post_preview[:4086] + "_"
 
-    context.user_data["has_link"] = False
+    context.user_data["has_link"]   = False
+    context.user_data["post_fmt"]   = "long"
     await update.effective_message.reply_text(
         post_preview,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=post_actions(has_link=False),
+        reply_markup=post_actions(has_link=False, fmt="long"),
     )
 
 # ══════════════════════════════════════════════════════════
@@ -790,10 +939,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "add_link":
         context.user_data["waiting_for"] = "add_link"
+        # Kayıtlı link varsa seçim sunulsun
+        saved_btns = []
+        for lnk in list(_LINK_STORE.values())[-4:]:
+            label = f"[{lnk['id']}] {lnk['platform']}"
+            saved_btns.append([InlineKeyboardButton(label, callback_data=f"link_use_{lnk['id']}")])
+        saved_btns.append([InlineKeyboardButton("🏠 İptal", callback_data="home")])
+        kb = InlineKeyboardMarkup(saved_btns) if _LINK_STORE else None
+
+        text_msg = (
+            "🔗 *Link Ekle*\n\n"
+            + ("Kayıtlı linklerinden birini seç *veya* aşağıya yeni link yapıştır:\n\n" if _LINK_STORE else "")
+            + "_Linki buraya yazabilirsin:_"
+        )
         await q.message.reply_text(
-            "🔗 *Referans linkini yaz veya yapıştır:*\n\n"
-            "_Örnek: `https://app.galxe.com/quest/...`_",
+            text_msg,
             parse_mode=ParseMode.MARKDOWN,
+            reply_markup=kb,
         )
 
     elif data == "send_text":
@@ -806,21 +968,164 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "regen_post":
         analysis = context.user_data.get("last_analysis")
         project  = context.user_data.get("last_project", "")
+        fmt      = context.user_data.get("post_fmt", "long")
         if not analysis:
             await q.message.reply_text("⚠️ Yenilemek için önce bir araştırma yap.")
             return
-        msg = await q.message.reply_text("♻️ *Post yeniden yazılıyor...*", parse_mode=ParseMode.MARKDOWN)
-        post = build_post(analysis, project)
+        fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet"}
+        msg = await q.message.reply_text(
+            f"♻️ *{fmt_label.get(fmt,'Post')} yeniden yazılıyor...*",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        post = build_post(analysis, project, fmt=fmt)
         context.user_data["last_post"]   = post
         context.user_data["final_post"]  = post
         context.user_data["has_link"]    = False
         preview = (
-            f"📣 *YENİLENEN POST:*\n\n{safe_md(post)}\n\n"
-            f"👇 *🔗 Link Ekle* butonuna bas, linki yapıştır, sonra gruba gönder."
+            f"♻️ *YENİLENEN POST ({fmt_label.get(fmt,'').upper()}):*\n\n{safe_md(post)}\n\n"
+            f"👇 *🔗 Link Ekle* butonuna bas, sonra gruba gönder."
         )
         if len(preview) > 4096:
             preview = preview[:4086] + "_"
-        await msg.edit_text(preview, parse_mode=ParseMode.MARKDOWN, reply_markup=post_actions(has_link=False))
+        await msg.edit_text(
+            preview,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=post_actions(has_link=False, fmt=fmt),
+        )
+
+    elif data in ("fmt_long", "fmt_short", "fmt_summary"):
+        analysis = context.user_data.get("last_analysis")
+        project  = context.user_data.get("last_project", "")
+        if not analysis:
+            await q.answer("⚠️ Önce bir araştırma yap.", show_alert=True)
+            return
+        fmt_map  = {"fmt_long": "long", "fmt_short": "short", "fmt_summary": "summary"}
+        fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet"}
+        fmt = fmt_map[data]
+        await q.answer(f"{fmt_label[fmt]} format seçildi...")
+        msg = await q.message.reply_text(
+            f"{fmt_label[fmt]} *format hazırlanıyor...*",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        post = build_post(analysis, project, fmt=fmt)
+        context.user_data["last_post"]  = post
+        context.user_data["final_post"] = post
+        context.user_data["has_link"]   = False
+        context.user_data["post_fmt"]   = fmt
+
+        preview = (
+            f"{'📄' if fmt=='long' else '📝' if fmt=='short' else '⚡'} "
+            f"*{fmt_label[fmt].upper()} FORMAT:*\n\n"
+            f"{safe_md(post)}\n\n"
+            f"👇 *🔗 Link Ekle* butonuna bas, sonra gruba gönder."
+        )
+        if len(preview) > 4096:
+            preview = preview[:4086] + "_"
+        await msg.edit_text(
+            preview,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=post_actions(has_link=False, fmt=fmt),
+        )
+
+    elif data == "scan_menu":
+        await q.message.reply_text(
+            "🔍 *Hangi kategoriyi tarayalım?*\n\n"
+            "Sadece belirli bir türü taramak için seç.\n"
+            "_Hepsi → tüm kategoriler taranır (daha uzun sürer)_",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=category_filter_menu(),
+        )
+
+    elif data.startswith("cat_"):
+        cat_key = data[4:]   # "cat_bonus" → "bonus"
+        _, cats = CATEGORY_DEFS.get(cat_key, ("Hepsi", None))
+        cat_label, _ = CATEGORY_DEFS.get(cat_key, ("🌐 Hepsi", None))
+        msg = await q.message.reply_text(
+            f"🌐 *{cat_label} taranıyor...*\n_30-50 saniye sürebilir_",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        result = scan_active_airdrops(cats=cats)
+        context.user_data["last_scan"] = result
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
+            [InlineKeyboardButton("🔄 Yeniden Tara", callback_data=data),
+             InlineKeyboardButton("🔍 Kategori Değiştir", callback_data="scan_menu")],
+            [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
+        ])
+        text = f"✅ *{cat_label.upper()} TARAMASI TAMAMLANDI*\n\n{safe_md(result)}"
+        if len(text) > 4096:
+            text = text[:4086] + "_"
+        await msg.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+    # ── Link Yönetimi ─────────────────────────────────────────────────
+    elif data == "link_stats":
+        stats = get_link_stats()
+        await q.message.reply_text(
+            stats,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔗 Linklerimi Yönet", callback_data="link_manage"),
+                InlineKeyboardButton("🏠 Ana Menü", callback_data="home"),
+            ]]),
+        )
+
+    elif data == "link_manage":
+        await q.message.reply_text(
+            "🔗 *KAYIT LİNKLERİM*\n\nBir linki seçerek posta ekleyebilirsin.\n"
+            "Yeni link eklemek için *➕ Yeni Link Ekle*'ye bas.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=get_link_list_menu(),
+        )
+
+    elif data == "link_add_new":
+        context.user_data["waiting_for"] = "link_add"
+        await q.message.reply_text(
+            "🔗 *Yeni Kayıt Linki Ekle*\n\n"
+            "Şu formatta yaz:\n"
+            "`PLATFORM_ADI | https://link.com/referral`\n\n"
+            "_Örnek: `CoinTR | https://partner.cointr.com/short/abc`_",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    elif data.startswith("link_use_"):
+        lid = data[9:]   # "link_use_AB1234" → "AB1234"
+        lnk = _LINK_STORE.get(lid)
+        if not lnk:
+            await q.answer("Link bulunamadı.", show_alert=True)
+            return
+        # Postu güncelle — mevcut posta bu linki ekle
+        post = context.user_data.get("last_post", "")
+        if not post:
+            await q.answer("⚠️ Önce bir post oluştur.", show_alert=True)
+            return
+        updated = post.replace("[🔗 LİNK]", lnk["url"])
+        context.user_data["final_post"] = updated
+        context.user_data["has_link"]   = True
+        record_post_use(lid)
+        await q.answer(f"✅ {lnk['platform']} linki eklendi!", show_alert=False)
+        fmt = context.user_data.get("post_fmt", "long")
+        preview = (
+            f"✅ *{lnk['platform']} linki eklendi!*\n\n"
+            f"{safe_md(updated)}"
+        )
+        if len(preview) > 4096:
+            preview = preview[:4086] + "_"
+        await q.message.reply_text(
+            preview,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=post_actions(has_link=True, fmt=fmt),
+        )
+
+    elif data == "link_clear":
+        _LINK_STORE.clear()
+        await q.answer("🗑️ Tüm linkler silindi.", show_alert=True)
+        await q.message.reply_text(
+            "🗑️ Kayıtlı tüm linkler silindi.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=main_menu(),
+        )
 
     elif data == "new_research":
         context.user_data["waiting_for"] = None
