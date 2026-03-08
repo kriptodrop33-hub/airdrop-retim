@@ -39,12 +39,15 @@ tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 #  ADMIN GUARD
 # ══════════════════════════════════════════════════════════
 def admin_only(func):
-    """Decorator: yalnızca admin DM'den erişebilir."""
+    """Decorator: yalnızca admin DM'den erişebilir. Grupları ve yabancıları sessizce yoksay."""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id   = update.effective_user.id
         chat_type = update.effective_chat.type
-        if user_id != ADMIN_CHAT_ID or chat_type != "private":
-            await update.message.reply_text("⛔ Bu bot yalnızca admin DM üzerinden kullanılabilir.")
+        # Grup/kanal ise hiç cevap verme
+        if chat_type in ("group", "supergroup", "channel"):
+            return
+        # Admin değilse sessiz kal (uyarı mesajı yazma)
+        if user_id != ADMIN_CHAT_ID:
             return
         return await func(update, context)
     wrapper.__name__ = func.__name__
@@ -430,8 +433,13 @@ async def cmd_sendgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #  MESAJ İŞLEYİCİ — URL veya Airdrop Adı
 # ══════════════════════════════════════════════════════════
 
-@admin_only
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Grup / kanal mesajlarını tamamen yoksay
+    if update.effective_chat.type in ("group", "supergroup", "channel"):
+        return
+    # Sadece admin DM'i işle, başkasına sessiz kal
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        return
     text = update.message.text.strip()
     waiting = context.user_data.get("waiting_for")
 
