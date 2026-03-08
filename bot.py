@@ -25,12 +25,18 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════
 #  ENV
 # ══════════════════════════════════════════════════════════
-BOT_TOKEN           = os.environ["BOT_TOKEN"]
-GROQ_API_KEY        = os.environ["GROQ_API_KEY"]
-TAVILY_API_KEY      = os.environ["TAVILY_API_KEY"]
-UNSPLASH_ACCESS_KEY = os.environ["UNSPLASH_ACCESS_KEY"]
-ADMIN_CHAT_ID       = int(os.environ["ADMIN_CHAT_ID"])
-GROUP_CHAT_ID       = int(os.environ["GROUP_CHAT_ID"])
+def _require_env(key):
+    val = os.environ.get(key, "")
+    if not val:
+        raise RuntimeError(f"Zorunlu env var eksik: {key} — Railway Variables sekmesine ekle!")
+    return val
+
+BOT_TOKEN           = _require_env("BOT_TOKEN")
+GROQ_API_KEY        = _require_env("GROQ_API_KEY")
+TAVILY_API_KEY      = _require_env("TAVILY_API_KEY")
+UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "")
+ADMIN_CHAT_ID       = int(_require_env("ADMIN_CHAT_ID"))
+GROUP_CHAT_ID       = int(_require_env("GROUP_CHAT_ID"))
 
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
