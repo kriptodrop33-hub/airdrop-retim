@@ -25,18 +25,12 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════
 #  ENV
 # ══════════════════════════════════════════════════════════
-def _require_env(key):
-    val = os.environ.get(key, "")
-    if not val:
-        raise RuntimeError(f"Zorunlu env var eksik: {key} — Railway Variables sekmesine ekle!")
-    return val
-
-BOT_TOKEN           = _require_env("BOT_TOKEN")
-GROQ_API_KEY        = _require_env("GROQ_API_KEY")
-TAVILY_API_KEY      = _require_env("TAVILY_API_KEY")
-UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "")
-ADMIN_CHAT_ID       = int(_require_env("ADMIN_CHAT_ID"))
-GROUP_CHAT_ID       = int(_require_env("GROUP_CHAT_ID"))
+BOT_TOKEN           = os.environ["BOT_TOKEN"]
+GROQ_API_KEY        = os.environ["GROQ_API_KEY"]
+TAVILY_API_KEY      = os.environ["TAVILY_API_KEY"]
+UNSPLASH_ACCESS_KEY = os.environ["UNSPLASH_ACCESS_KEY"]
+ADMIN_CHAT_ID       = int(os.environ["ADMIN_CHAT_ID"])
+GROUP_CHAT_ID       = int(os.environ["GROUP_CHAT_ID"])
 
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
@@ -342,8 +336,23 @@ def safe_md(text: str) -> str:
 #  KOMUTLAR
 # ══════════════════════════════════════════════════════════
 
-@admin_only
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin kontrolü olmadan çalışır — kim olursa olsun ID'sini gösterir."""
+    user_id   = update.effective_user.id
+    chat_type = update.effective_chat.type
+
+    # Admin değilse sadece ID bilgisi ver
+    if user_id != ADMIN_CHAT_ID or chat_type != "private":
+        await update.message.reply_text(
+            f"⛔ Bu bot yalnızca admin DM üzerinden kullanılabilir.\n\n"
+            f"🆔 Senin ID'n: `{user_id}`\n"
+            f"💬 Chat tipi: `{chat_type}`\n\n"
+            f"Eğer admin sensin, Railway Variables'da\n"
+            f"`ADMIN_CHAT_ID = {user_id}` olarak ayarla.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
     context.user_data.clear()
     await update.message.reply_text(
         "🤖 *AIRDROP BOT* — Admin Paneli\n\n"
