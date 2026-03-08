@@ -219,45 +219,132 @@ Eğer bilgi yoksa "Bilinmiyor" yaz. Türkçe yaz."""
     return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=1500)
 
 
+# ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
+OPPORTUNITY_QUERIES = [
+    # Klasik airdrop
+    ("airdrop",     "free crypto airdrop 2025 claim social tasks no deposit"),
+    ("airdrop",     "new token airdrop galxe zealy discord twitter 2025"),
+    # Borsa yeni kullanıcı / kayıt bonusu
+    ("kayıt_bonus", "crypto exchange sign up bonus free USDT new user reward 2025"),
+    ("kayıt_bonus", "CEX welcome bonus no deposit crypto reward new account 2025"),
+    # Trading ödülü / kampanya
+    ("kampanya",    "crypto exchange trading competition prize pool 2025"),
+    ("kampanya",    "crypto platform referral bonus earn USDT invite friends 2025"),
+    # Testnet / görev ödülü
+    ("testnet",     "crypto testnet reward points token 2025 easy tasks"),
+    ("testnet",     "earn crypto completing tasks learn platform quiz reward 2025"),
+    # Staking / yield — düşük bariyer
+    ("yield",       "crypto platform free staking reward promo APY boost 2025"),
+    # NFT / mint fırsatı
+    ("nft",         "free NFT mint claim 2025 no gas wallet connect"),
+    # Play-to-earn / görev platformu
+    ("p2e",         "play to earn crypto reward 2025 free simple tasks"),
+]
+
+
+def run_opportunity_search() -> list[dict]:
+    """
+    Tüm kategorilerde Tavily araması yapar.
+    Her sonucu kategori etiketiyle birlikte döndürür.
+    """
+    seen_urls = set()
+    results = []
+    for category, query in OPPORTUNITY_QUERIES:
+        hits = deep_search(query, max_results=4)
+        for r in hits:
+            url = r.get("url", "")
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            results.append({
+                "category": category,
+                "title":    r.get("title", ""),
+                "url":      url,
+                "content":  r.get("content", "")[:900],
+            })
+    return results
+
+
 def scan_active_airdrops() -> str:
-    """İnterneti tara, aktif airdropları bul ve AI ile özetle."""
-    queries = [
-        "best active crypto airdrop claim free tokens 2025",
-        "new airdrop this week ethereum solana layer2 2025",
-        "upcoming airdrop allocation snapshot eligible 2025",
-    ]
-    all_results = []
-    for q in queries:
-        all_results.extend(deep_search(q, max_results=6))
+    """
+    Geniş kapsamlı kripto fırsatı tarayıcısı.
+    Airdrop, borsa bonusu, testnet ödülü, kampanya, NFT mint vb.
+    hepsini tek taramada bulur.
+    """
+    raw_results = run_opportunity_search()
 
-    seen = set()
-    unique = []
-    for r in all_results:
-        u = r.get("url", "")
-        if u not in seen:
-            seen.add(u)
-            unique.append(r)
+    if not raw_results:
+        return "❌ Veri çekilemedi. Lütfen tekrar deneyin."
 
-    raw = "\n\n".join([
-        f"[{i+1}] {r.get('title','')}\n{r.get('url','')}\n{r.get('content','')[:400]}"
-        for i, r in enumerate(unique[:12])
-    ])
+    # Kategoriye göre grupla — AI için düzenli sunum
+    by_cat: dict = {}
+    for r in raw_results:
+        cat = r["category"]
+        by_cat.setdefault(cat, []).append(r)
 
-    system = """Sen kripto airdrop listesi hazırlayan bir analistsin.
-Verilen arama sonuçlarından FARKLI 5-8 aktif airdrop tespit et.
-Her biri için şunu yaz:
+    cat_labels = {
+        "airdrop":     "🪂 AIRDROP",
+        "kayıt_bonus": "🎁 BORSA KAYIT BONUSU",
+        "kampanya":    "🏆 KAMPANYA / REFERRAL",
+        "testnet":     "🧪 TESTNET / GÖREV ÖDÜLÜ",
+        "yield":       "💸 STAKING PROMOSYONU",
+        "nft":         "🖼️ ÜCRETSİZ NFT MINT",
+        "p2e":         "🎮 KAZAN & OYNA",
+    }
 
-🪂 *[PROJE ADI]*
-├ 💰 Ödül: ...
-├ ⛓ Zincir: ...
-├ 📋 Görev: ...
-├ ⏰ Son Tarih: ...
-├ ⭐ Güvenilirlik: (1-5)
-└ 🔗 Link: ...
+    combined_raw = ""
+    for cat, items in by_cat.items():
+        label = cat_labels.get(cat, cat.upper())
+        combined_raw += f"\n\n{'='*40}\n{label}\n{'='*40}\n"
+        for item in items[:4]:
+            combined_raw += (
+                f"Başlık: {item['title']}\n"
+                f"URL: {item['url']}\n"
+                f"İçerik: {item['content']}\n---\n"
+            )
 
-Türkçe yaz. Tekrar eden projeleri çıkar. Bilinmiyorsa "?" yaz."""
+    system = """Sen kripto para fırsatları listeleyen uzman bir analistsin.
+Verilen ham arama içeriğinden GERÇEK, AKTİF ve ÜCRETSİZ katılılabilir fırsatları tespit et.
 
-    return ai(system, raw, tokens=2000)
+Fırsat türleri (hepsini kapsa):
+🪂 Airdrop — ücretsiz token dağıtımı
+🎁 Borsa kayıt bonusu — yeni üye USDT/token ödülü
+🏆 Kampanya — işlem yarışması, referral ödülü
+🧪 Testnet — ağı test et, token kazan
+💸 Staking promosyonu — yüksek APY kampanyası
+🖼️ Ücretsiz NFT mint — bedava NFT alma fırsatı
+🎮 Görev/Oyna kazan — basit görevlerle kripto kazan
+
+KABUL ET:
+✅ Sosyal görev (takip, retweet, Discord)
+✅ Kayıt + KYC + işlem bonusu
+✅ Referral / davet ödülü
+✅ Form doldurma, waitlist
+✅ Testnet işlemi
+✅ Galxe / Zealy / Crew3 kampanyaları
+
+REDDET:
+❌ Node / validator çalıştırma
+❌ Yüksek miktarda yatırım gerektiren
+❌ Sona ermiş / snapshot geçmiş
+❌ Sadece kurumsal / akredite yatırımcı
+
+KURAL: Bilgi eksikse o fırsatı ATLA — "?" yazma.
+Her fırsat için gerçek bilgileri doldur:
+
+[EMOJİ TÜR] *[PLATFORM / PROJE ADI]*
+├ 💰 Ödül: [miktar, para birimi, tahmini değer]
+├ ⛓ Zincir/Platform: [blockchain veya borsa adı]
+├ 🟢 Zorluk: Kolay / Orta
+├ 📋 Nasıl: [ne yapılacak — 1-2 cümle net]
+├ ⏰ Son Tarih: [tarih veya Belirsiz]
+├ ⭐ Güvenilirlik: [⭐⭐⭐⭐⭐ şeklinde 1-5]
+└ 🔗 Link: [direkt link]
+
+6-10 fırsat listele. Farklı kategorilerden çeşitli fırsatlar sun.
+Türkçe yaz. Sadece içerikte gerçekten geçen fırsatları listele."""
+
+    return ai(system, combined_raw[:7000], tokens=3000)
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
@@ -394,7 +481,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @admin_only
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(
-        "🌐 *İnternet taranıyor...*\n_Aktif airdroplar aranıyor, lütfen bekle (20-30 sn)_",
+        "🌐 *Taranıyor...*\n_Airdrop, borsa bonusu, kampanya, testnet ödülü aranıyor (30-50 sn)_",
         parse_mode=ParseMode.MARKDOWN,
     )
     await update.effective_chat.send_action(ChatAction.TYPING)
@@ -409,7 +496,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     await msg.edit_text(
-        f"✅ *TARAMA TAMAMLANDI*\n\n{safe_md(result)}",
+        f"✅ *FIRSATLAR TARANDII*\n\n{safe_md(result)}",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=keyboard,
     )
@@ -625,7 +712,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "scan":
         msg = await q.message.reply_text(
-            "🌐 *İnternet taranıyor...*\n_20-30 saniye sürebilir_",
+            "🌐 *Taranıyor...*\n_Tüm kripto fırsatları aranıyor (30-50 sn)_",
             parse_mode=ParseMode.MARKDOWN,
         )
         await update.effective_chat.send_action(ChatAction.TYPING)
@@ -637,7 +724,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan"),
              InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
         ])
-        text = f"✅ *TARAMA TAMAMLANDI*\n\n{safe_md(result)}"
+        text = f"✅ *FIRSATLAR TARANDII*\n\n{safe_md(result)}"
         if len(text) > 4096:
             text = text[:4086] + "_"
         await msg.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
@@ -710,7 +797,7 @@ async def auto_scan_job(context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text=f"🔔 *OTOMATİK TARAMA* — _{ts}_\n\n{safe_md(result)}",
+            text=f"🔔 *OTOMATİK TARAMA* — _{ts}_\n\n_Airdrop · Borsa bonusu · Kampanya · Testnet · NFT_\n\n{safe_md(result)}",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard,
         )
