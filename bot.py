@@ -361,39 +361,44 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik kazanım fırsatı postları yazan uzmansın.
+POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik çarpıcı, dikkat çekici kazanım fırsatı postları yazan uzmansın.
 
 KURAL:
 - Türkçe yaz
 - Telegram normal Markdown (*bold*, _italic_) — MarkdownV2 KULLANMA
 - KESİNLİKLE hashtag (#) kullanma — hiçbir satırda etiket yok
 - Link için tam olarak şu metni bırak: [🔗 LİNK]
-- Rakamlar somut olsun: "2600 TL", "50 USDT" gibi
-- Adımlar numaralı olsun
-- Maksimum 950 karakter
+- SADECE analizde geçen gerçek rakamları kullan — asla uydurma
+- Adımlar numaralı, her adımın yanında ödülü varsa yaz
+- Post dolup taşsın — boş alan bırakma, her bilgiyi doldur
+- Maksimum 1000 karakter
 
-ŞABLON (fırsat türüne göre başlığı uyarla):
+ŞABLON:
 
-💸 *[PLATFORM ADI] — [FIRSATIN KISA ADI]* 💸
+🚨 *[PLATFORM] — [KISA BAŞLIK]* 🚨
 
-━━━━━━━━━━━━━━━━━━━━
-💰 *Yeni Kullanıcı:* [toplam ödül]
-💰 *Mevcut Kullanıcı:* [varsa ödül — yoksa bu satırı kaldır]
-━━━━━━━━━━━━━━━━━━━━
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+🎁 *Yeni Kullanıcı Ödülü:* [rakam + birim]
+🔄 *Mevcut Kullanıcı:* [rakam varsa — yoksa satırı sil]
+👤 *Kimler:* [yeni üye / herkes / ülke kısıtı]
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-📋 *Adımlar:*
-1️⃣ [adım 1] → [ödül miktarı]
-2️⃣ [adım 2] → [ödül miktarı]
-3️⃣ [adım 3] → [ödül miktarı]
-4️⃣ [adım 4] → [ödül miktarı]
+✅ *Nasıl Kazanılır?*
+1️⃣ [adım] → [ödül miktarı]
+2️⃣ [adım] → [ödül miktarı]
+3️⃣ [adım] → [ödül miktarı]
+4️⃣ [adım] → [ödül miktarı]
 
-⏰ *Son Tarih:* [tarih veya "Kampanya süresi boyunca"]
-━━━━━━━━━━━━━━━━━━━━
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+💎 *Toplam Kazanılabilir:* [toplam rakam]
+⏳ *Son Tarih:* [tarih veya kampanya süresi boyunca]
+⚠️ *Dikkat:* [min yatırım / KYC / kısıt — yoksa satırı sil]
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 
-➡️ *Kayıt / Katılım:*
+🔥 *Hemen Katıl — Kontenjan Dolmadan!*
 👉 [🔗 LİNK]
 
-⚡ _Fırsatı kaçırma!_"""
+_⚡ Bu fırsatı kaçırma — arkadaşlarınla da paylaş!_"""
 
 def build_post(analysis: str, project_name: str) -> str:
     prompt = (
