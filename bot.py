@@ -220,33 +220,31 @@ Eğer bilgi yoksa "Bilinmiyor" yaz. Türkçe yaz."""
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
+# ── Fırsat arama sorguları ─────────────────────────────────────────────
+# Borsa kayıt bonusu + kampanya ağırlıklı, airdrop destekli
 OPPORTUNITY_QUERIES = [
-    # Klasik airdrop
-    ("airdrop",     "free crypto airdrop 2025 claim social tasks no deposit"),
-    ("airdrop",     "new token airdrop galxe zealy discord twitter 2025"),
-    # Borsa yeni kullanıcı / kayıt bonusu
-    ("kayıt_bonus", "crypto exchange sign up bonus free USDT new user reward 2025"),
-    ("kayıt_bonus", "CEX welcome bonus no deposit crypto reward new account 2025"),
-    # Trading ödülü / kampanya
-    ("kampanya",    "crypto exchange trading competition prize pool 2025"),
-    ("kampanya",    "crypto platform referral bonus earn USDT invite friends 2025"),
-    # Testnet / görev ödülü
-    ("testnet",     "crypto testnet reward points token 2025 easy tasks"),
-    ("testnet",     "earn crypto completing tasks learn platform quiz reward 2025"),
-    # Staking / yield — düşük bariyer
-    ("yield",       "crypto platform free staking reward promo APY boost 2025"),
-    # NFT / mint fırsatı
-    ("nft",         "free NFT mint claim 2025 no gas wallet connect"),
-    # Play-to-earn / görev platformu
-    ("p2e",         "play to earn crypto reward 2025 free simple tasks"),
+    # Borsa yeni kullanıcı bonusu — Türkçe borsalar dahil
+    ("bonus", "kripto borsa yeni kullanıcı ödülü kayıt bonusu USDT TL 2025"),
+    ("bonus", "crypto exchange new user bonus welcome reward USDT 2025 site:binance.com OR site:bybit.com OR site:okx.com OR site:cointr.com OR site:bitlo.com"),
+    ("bonus", "crypto exchange sign up reward deposit bonus free USDT 2026"),
+    ("bonus", "borsa kayıt kampanyası hediye 2025 site:cointr.com OR site:paribu.com OR site:btcturk.com"),
+    # Referral / davet kampanyası
+    ("referral", "crypto referral program earn USDT invite friends commission 2025 2026"),
+    ("referral", "kripto borsa arkadaş davet et kazan referral ödülü 2025"),
+    # İşlem / trading kampanyası
+    ("kampanya", "crypto exchange trading competition reward prize USDT 2025 2026"),
+    ("kampanya", "kripto borsa işlem kampanyası ödül havuzu 2025"),
+    # Telegram / sosyal görev ödülü
+    ("sosyal", "telegram crypto bot task reward earn token USDT 2025"),
+    ("sosyal", "crypto project telegram task reward points 2025 airdrop"),
+    # Klasik kolay airdrop
+    ("airdrop", "easy crypto airdrop 2026 free token social task discord twitter"),
+    ("airdrop", "new airdrop claim 2025 2026 galxe zealy no stake required free"),
 ]
 
 
 def run_opportunity_search() -> list[dict]:
-    """
-    Tüm kategorilerde Tavily araması yapar.
-    Her sonucu kategori etiketiyle birlikte döndürür.
-    """
+    """Tüm kategorilerde Tavily araması, uzun içerik çeker."""
     seen_urls = set()
     results = []
     for category, query in OPPORTUNITY_QUERIES:
@@ -256,134 +254,127 @@ def run_opportunity_search() -> list[dict]:
             if url in seen_urls:
                 continue
             seen_urls.add(url)
+            # Her sonuçtan 1200 karakter al — AI için zengin veri
             results.append({
                 "category": category,
                 "title":    r.get("title", ""),
                 "url":      url,
-                "content":  r.get("content", "")[:900],
+                "content":  r.get("content", "")[:1200],
             })
     return results
 
 
 def scan_active_airdrops() -> str:
     """
-    Geniş kapsamlı kripto fırsatı tarayıcısı.
-    Airdrop, borsa bonusu, testnet ödülü, kampanya, NFT mint vb.
-    hepsini tek taramada bulur.
+    Kripto kazanım fırsatı tarayıcısı.
+    Odak: borsa kayıt bonusu, referral, kampanya, Telegram görevi, airdrop.
     """
     raw_results = run_opportunity_search()
 
     if not raw_results:
         return "❌ Veri çekilemedi. Lütfen tekrar deneyin."
 
-    # Kategoriye göre grupla — AI için düzenli sunum
+    # Kategoriye göre grupla
     by_cat: dict = {}
     for r in raw_results:
         cat = r["category"]
         by_cat.setdefault(cat, []).append(r)
 
     cat_labels = {
-        "airdrop":     "🪂 AIRDROP",
-        "kayıt_bonus": "🎁 BORSA KAYIT BONUSU",
-        "kampanya":    "🏆 KAMPANYA / REFERRAL",
-        "testnet":     "🧪 TESTNET / GÖREV ÖDÜLÜ",
-        "yield":       "💸 STAKING PROMOSYONU",
-        "nft":         "🖼️ ÜCRETSİZ NFT MINT",
-        "p2e":         "🎮 KAZAN & OYNA",
+        "bonus":    "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
+        "referral": "👥 REFERRAL / DAVET KAMPANYASI",
+        "kampanya": "🏆 İŞLEM / TRADİNG KAMPANYASI",
+        "sosyal":   "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
+        "airdrop":  "🪂 AIRDROP",
     }
 
     combined_raw = ""
     for cat, items in by_cat.items():
         label = cat_labels.get(cat, cat.upper())
-        combined_raw += f"\n\n{'='*40}\n{label}\n{'='*40}\n"
-        for item in items[:4]:
-            combined_raw += (
-                f"Başlık: {item['title']}\n"
-                f"URL: {item['url']}\n"
-                f"İçerik: {item['content']}\n---\n"
-            )
+        sep = "=" * 40
+        combined_raw += f"\n\n{sep}\n{label}\n{sep}\n"
+        for item in items[:3]:
+            t = item["title"]
+            u = item["url"]
+            c = item["content"]
+            combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
+    system = """Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
+Amacın: Sıradan bir kullanıcının GERÇEKTEN para kazanabileceği, somut rakamlı, aktif fırsatları bulmak.
 
-    system = """Sen kripto para fırsatları listeleyen uzman bir analistsin.
-Verilen ham arama içeriğinden GERÇEK, AKTİF ve ÜCRETSİZ katılılabilir fırsatları tespit et.
-
-Fırsat türleri (hepsini kapsa):
-🪂 Airdrop — ücretsiz token dağıtımı
-🎁 Borsa kayıt bonusu — yeni üye USDT/token ödülü
-🏆 Kampanya — işlem yarışması, referral ödülü
-🧪 Testnet — ağı test et, token kazan
-💸 Staking promosyonu — yüksek APY kampanyası
-🖼️ Ücretsiz NFT mint — bedava NFT alma fırsatı
-🎮 Görev/Oyna kazan — basit görevlerle kripto kazan
-
-KABUL ET:
-✅ Sosyal görev (takip, retweet, Discord)
-✅ Kayıt + KYC + işlem bonusu
-✅ Referral / davet ödülü
-✅ Form doldurma, waitlist
-✅ Testnet işlemi
-✅ Galxe / Zealy / Crew3 kampanyaları
+ÖNCELİKLİ FIRSATLAR (bunları ön plana çıkar):
+🎁 Borsa kayıt bonusu — Yeni üye ol, KYC yap, işlem yap → USDT/TL kazan
+   Örnek: "Kayıt ol + 1000TL yatır → 200TL bonus"
+👥 Referral kampanyası — Arkadaşını davet et → komisyon/bonus kazan
+🏆 Trading kampanyası — Belirli hacimde işlem yap → ödül havuzundan pay al
+📱 Telegram/Discord görevi — Bot kullan, görev tamamla → token/USDT kazan
+🪂 Kolay airdrop — Sosyal takip, form doldur → token kazan
 
 REDDET:
-❌ Node / validator çalıştırma
-❌ Yüksek miktarda yatırım gerektiren
-❌ Sona ermiş / snapshot geçmiş
-❌ Sadece kurumsal / akredite yatırımcı
+❌ Validator/node gerektiren
+❌ 10.000$+ yatırım gerektiren
+❌ Sona ermiş kampanyalar
+❌ Bilgisi belirsiz/eksik fırsatlar
 
-KURAL: Bilgi eksikse o fırsatı ATLA — "?" yazma.
-Her fırsat için gerçek bilgileri doldur:
+FORMAT — CoinTR örneğindeki gibi somut ve detaylı yaz:
 
-[EMOJİ TÜR] *[PLATFORM / PROJE ADI]*
-├ 💰 Ödül: [miktar, para birimi, tahmini değer]
-├ ⛓ Zincir/Platform: [blockchain veya borsa adı]
-├ 🟢 Zorluk: Kolay / Orta
-├ 📋 Nasıl: [ne yapılacak — 1-2 cümle net]
-├ ⏰ Son Tarih: [tarih veya Belirsiz]
-├ ⭐ Güvenilirlik: [⭐⭐⭐⭐⭐ şeklinde 1-5]
-└ 🔗 Link: [direkt link]
+🎁 *[BORSA/PLATFORM ADI]*
+├ 💰 Toplam Ödül: [somut rakam — örn: 2600 TL veya 50 USDT]
+├ 🏦 Platform: [borsa veya platform adı]
+├ 👥 Kimler: [Yeni kullanıcı / Mevcut kullanıcı / Herkes]
+├ 📋 Adımlar:
+│  1️⃣ [ilk adım → kaç TL/USDT]
+│  2️⃣ [ikinci adım → kaç TL/USDT]
+│  3️⃣ [üçüncü adım → kaç TL/USDT]
+├ ⏰ Son Tarih: [tarih veya kampanya süresi boyunca]
+├ ⭐ Güvenilirlik: [⭐⭐⭐⭐⭐]
+└ 🔗 Link: [direkt kayıt/katılım linki]
 
-6-10 fırsat listele. Farklı kategorilerden çeşitli fırsatlar sun.
-Türkçe yaz. Sadece içerikte gerçekten geçen fırsatları listele."""
+KURALLAR:
+- Rakamlar somut olsun: "2600 TL", "50 USDT", "25$ bonus" gibi
+- Adımlar numaralı ve net olsun
+- Eksik bilgi varsa o fırsatı ATLA — asla "?" yazma
+- 5-8 fırsat listele, kaliteli ve gerçek olanları seç
+- Türkçe yaz"""
 
-    return ai(system, combined_raw[:7000], tokens=3000)
+    return ai(system, combined_raw[:8000], tokens=3500)
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-POST_SYSTEM = """Sen Telegram kripto grupları için viral airdrop postları yazan uzmansın.
+POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik kazanım fırsatı postları yazan uzmansın.
 
 KURAL:
 - Türkçe yaz
-- Telegram normal Markdown kullan (*bold*, _italic_) — MarkdownV2 KULLANMA
-- Maksimum emojilerle dikkat çekici yap
-- Post şablonunu AYNEN kullan
-- Maksimum 900 karakter tut
-- KESİNLİKLE hashtag (#) kullanma — hiçbir satırda etiket olmayacak
+- Telegram normal Markdown (*bold*, _italic_) — MarkdownV2 KULLANMA
+- KESİNLİKLE hashtag (#) kullanma — hiçbir satırda etiket yok
 - Link için tam olarak şu metni bırak: [🔗 LİNK]
+- Rakamlar somut olsun: "2600 TL", "50 USDT" gibi
+- Adımlar numaralı olsun
+- Maksimum 950 karakter
 
-ŞABLON:
-🚨 *[PROJE ADI] AİRDROP* 🚨
+ŞABLON (fırsat türüne göre başlığı uyarla):
+
+💸 *[PLATFORM ADI] — [FIRSATIN KISA ADI]* 💸
 
 ━━━━━━━━━━━━━━━━━━━━
-🏆 *ÖDÜL:* [miktar token / tahmini değer]
-⛓ *ZİNCİR:* [blockchain]
-👥 *UYGUNLUK:* [kimler katılabilir]
+💰 *Yeni Kullanıcı:* [toplam ödül]
+💰 *Mevcut Kullanıcı:* [varsa ödül — yoksa bu satırı kaldır]
 ━━━━━━━━━━━━━━━━━━━━
 
-📋 *GÖREVLER:*
-✅ [görev 1]
-✅ [görev 2]
-✅ [görev 3]
-✅ [görev 4]
+📋 *Adımlar:*
+1️⃣ [adım 1] → [ödül miktarı]
+2️⃣ [adım 2] → [ödül miktarı]
+3️⃣ [adım 3] → [ödül miktarı]
+4️⃣ [adım 4] → [ödül miktarı]
 
-⏰ *SON TARİH:* [tarih veya "Sınırlı süre!"]
+⏰ *Son Tarih:* [tarih veya "Kampanya süresi boyunca"]
 ━━━━━━━━━━━━━━━━━━━━
 
-🔥 *KATIL & KAZAN:*
+➡️ *Kayıt / Katılım:*
 👉 [🔗 LİNK]
 
-⚠️ _Hızlı ol! Kontenjan dolmadan katıl._"""
-
+⚡ _Fırsatı kaçırma!_"""
 
 def build_post(analysis: str, project_name: str) -> str:
     return ai(
