@@ -264,10 +264,12 @@ POST_SYSTEM = """Sen Telegram kripto grupları için viral airdrop postları yaz
 
 KURAL:
 - Türkçe yaz
-- Telegram MarkdownV2 DEĞİL, normal Markdown (*bold*, _italic_) kullan
+- Telegram normal Markdown kullan (*bold*, _italic_) — MarkdownV2 KULLANMA
 - Maksimum emojilerle dikkat çekici yap
-- Post şablonunu AYNEN kullan, boşluk bırakma
-- Maksimum 900 karakter (caption limiti için)
+- Post şablonunu AYNEN kullan
+- Maksimum 900 karakter tut
+- KESİNLİKLE hashtag (#) kullanma — hiçbir satırda etiket olmayacak
+- Link için tam olarak şu metni bırak: [🔗 LİNK]
 
 ŞABLON:
 🚨 *[PROJE ADI] AİRDROP* 🚨
@@ -288,11 +290,9 @@ KURAL:
 ━━━━━━━━━━━━━━━━━━━━
 
 🔥 *KATIL & KAZAN:*
-👉 [🔗 REFERANS LİNKİ BURAYA]
+👉 [🔗 LİNK]
 
-⚠️ _Hızlı ol! Kontenjan dolmadan katıl._
-
-#Airdrop #Kripto #ÜcretizToken #Crypto"""
+⚠️ _Hızlı ol! Kontenjan dolmadan katıl._"""
 
 
 def build_post(analysis: str, project_name: str) -> str:
@@ -317,8 +317,10 @@ def main_menu() -> InlineKeyboardMarkup:
          InlineKeyboardButton("❓ Yardım", callback_data="help")],
     ])
 
-def post_actions() -> InlineKeyboardMarkup:
+def post_actions(has_link: bool = False) -> InlineKeyboardMarkup:
+    link_btn_label = "✅ Link Eklendi" if has_link else "🔗 Link Ekle"
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton(link_btn_label, callback_data="add_link")],
         [InlineKeyboardButton("📢 Gruba Gönder (Metin)", callback_data="send_text"),
          InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_photo")],
         [InlineKeyboardButton("♻️ Postu Yenile", callback_data="regen_post"),
@@ -329,30 +331,32 @@ async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
 def safe_md(text: str) -> str:
-    """Markdown parse hatalarına karşı temizle."""
-    return text.replace("**", "*")
+    """Markdown parse hatalarına karşı temizle, hashtag kaldır."""
+    import re
+    text = text.replace("**", "*")
+    # Satır başındaki hashtag satırlarını temizle
+    text = re.sub(r'(?m)^#\w[\w\s#]*$', "", text)
+    # Satır içi hashtag'leri kaldır
+    text = re.sub(r'#\w+', "", text)
+    # Birden fazla boş satırı teke indir
+    text = re.sub(r'\n{3,}', "\n\n", text)
+    return text.strip()
 
 # ══════════════════════════════════════════════════════════
 #  KOMUTLAR
 # ══════════════════════════════════════════════════════════
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin kontrolü olmadan çalışır — kim olursa olsun ID'sini gösterir."""
     user_id   = update.effective_user.id
     chat_type = update.effective_chat.type
-
-    # Admin değilse sadece ID bilgisi ver
     if user_id != ADMIN_CHAT_ID or chat_type != "private":
         await update.message.reply_text(
-            f"⛔ Bu bot yalnızca admin DM üzerinden kullanılabilir.\n\n"
+            f"⛔ Bu bot yalnızca admin DM'inden kullanılabilir.\n\n"
             f"🆔 Senin ID'n: `{user_id}`\n"
-            f"💬 Chat tipi: `{chat_type}`\n\n"
-            f"Eğer admin sensin, Railway Variables'da\n"
-            f"`ADMIN_CHAT_ID = {user_id}` olarak ayarla.",
+            f"Eğer admin sensin Railway Variables'da `ADMIN_CHAT_ID = {user_id}` yap.",
             parse_mode=ParseMode.MARKDOWN,
         )
         return
-
     context.user_data.clear()
     await update.message.reply_text(
         "🤖 *AIRDROP BOT* — Admin Paneli\n\n"
@@ -379,8 +383,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Bir URL at → sayfa derin araştırılır\n"
         "• Airdrop adı yaz → derin araştırma başlar\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "⚠️ Post hazır olunca `[🔗 REFERANS LİNKİ BURAYA]`\n"
-        "yerine kendi referans linkini yapıştır.",
+        "⚠️ Post hazır olunca *🔗 Link Ekle* butonuna bas,\n"
+        "linki yapıştır — post'a otomatik eklenir.",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -431,7 +435,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     waiting = context.user_data.get("waiting_for")
 
-    # Post düzenleme (referans linki ekleme)
+    # Link ekleme state
+    if waiting == "add_link":
+        context.user_data["waiting_for"] = None
+        post = context.user_data.get("last_post", "")
+        # [🔗 LİNK] placeholder'ını gerçek linkle değiştir
+        updated = post.replace("[🔗 LİNK]", text.strip())
+        context.user_data["final_post"] = updated
+        context.user_data["has_link"] = True
+        preview = (
+            f"✅ *Link eklendi!*\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📣 *GÜNCEL POST:*\n\n"
+            f"{safe_md(updated)}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Hazır! Gruba gönderebilirsin."
+        )
+        if len(preview) > 4096:
+            preview = preview[:4086] + "_"
+        await update.message.reply_text(
+            preview,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=post_actions(has_link=True),
+        )
+        return
+
+    # Post düzenleme (eski compat)
     if waiting == "edit_post":
         context.user_data["waiting_for"] = None
         context.user_data["final_post"] = text
@@ -500,16 +529,17 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         f"📣 *HAZIRLANAN POST:*\n\n"
         f"{safe_md(post)}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚠️ _\\[🔗 REFERANS LİNKİ BURAYA\\] yerine kendi linkini ekle, ardından gruba gönder._"
+        f"👇 *🔗 Link Ekle* butonuna bas, linki yapıştır, sonra gruba gönder."
     )
 
     if len(post_preview) > 4096:
         post_preview = post_preview[:4086] + "_"
 
+    context.user_data["has_link"] = False
     await update.effective_message.reply_text(
         post_preview,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=post_actions(),
+        reply_markup=post_actions(has_link=False),
     )
 
 # ══════════════════════════════════════════════════════════
@@ -528,7 +558,7 @@ async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, wit
     try:
         if with_photo:
             img_url = get_image(f"{platform} crypto blockchain token")
-            caption = post[:1020] if len(post) > 1020 else post
+            caption = post[:1024] if len(post) > 1024 else post
             if img_url:
                 await context.bot.send_photo(
                     chat_id=GROUP_CHAT_ID,
@@ -615,6 +645,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.MARKDOWN,
         )
 
+    elif data == "add_link":
+        context.user_data["waiting_for"] = "add_link"
+        await q.message.reply_text(
+            "🔗 *Referans linkini yaz veya yapıştır:*\n\n"
+            "_Örnek: `https://app.galxe.com/quest/...`_",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
     elif data == "send_text":
         await _send_to_group(update, context, with_photo=False)
 
@@ -632,10 +670,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         post = build_post(analysis, project)
         context.user_data["last_post"]   = post
         context.user_data["final_post"]  = post
-        preview = f"📣 *YENİLENEN POST:*\n\n{safe_md(post)}\n\n⚠️ _Referans linkini ekle, ardından gönder._"
+        context.user_data["has_link"]    = False
+        preview = (
+            f"📣 *YENİLENEN POST:*\n\n{safe_md(post)}\n\n"
+            f"👇 *🔗 Link Ekle* butonuna bas, linki yapıştır, sonra gruba gönder."
+        )
         if len(preview) > 4096:
             preview = preview[:4086] + "_"
-        await msg.edit_text(preview, parse_mode=ParseMode.MARKDOWN, reply_markup=post_actions())
+        await msg.edit_text(preview, parse_mode=ParseMode.MARKDOWN, reply_markup=post_actions(has_link=False))
 
     elif data == "new_research":
         context.user_data["waiting_for"] = None
