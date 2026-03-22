@@ -154,44 +154,30 @@ AIRDROP_DOMAINS = [
 
 def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
     """
-    Ücretsiz DuckDuckGo arama — Tavily kotası dolunca devreye girer.
-    API key gerektirmez.
+    Gerçek DuckDuckGo arama — duckduckgo_search kütüphanesi.
+    API key yok, limit yok, gerçek sonuçlar döner.
     """
     try:
-        r = requests.get(
-            "https://api.duckduckgo.com/",
-            params={"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"},
-            timeout=10,
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        data = r.json()
+        from duckduckgo_search import DDGS
         results = []
-        # RelatedTopics varsa al
-        for item in data.get("RelatedTopics", [])[:max_results]:
-            if "Text" in item and "FirstURL" in item:
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=max_results):
                 results.append({
-                    "title":   item.get("Text","")[:100],
-                    "url":     item.get("FirstURL",""),
-                    "content": item.get("Text",""),
+                    "title":   r.get("title", ""),
+                    "url":     r.get("href", ""),
+                    "content": r.get("body", ""),
                 })
-        # AbstractText varsa ekle
-        if data.get("AbstractText"):
-            results.insert(0, {
-                "title":   data.get("Heading",""),
-                "url":     data.get("AbstractURL",""),
-                "content": data.get("AbstractText",""),
-            })
+        logger.info(f"DDG arama: '{query[:50]}' → {len(results)} sonuç")
         return results
     except Exception as e:
         logger.error(f"DDG hata: {e}")
         return []
 
 def _httpx_scrape(url: str) -> str:
-    """Basit HTTP scrape — Tavily extract kotası dolunca fallback."""
+    """Basit HTTP scrape — URL içeriğini çek ve temizle."""
     try:
         r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
         if r.status_code == 200:
-            # HTML taglarını temizle
             text = re.sub(r'<[^>]+>', ' ', r.text)
             text = re.sub(r'\s+', ' ', text)
             return text[:3000]
@@ -204,28 +190,28 @@ _tavily_quota_ok = True
 
 def deep_search(query: str, max_results: int = 5) -> list[dict]:
     """
-    Önce Tavily dene, kota dolmuşsa (432) DuckDuckGo'ya geç.
-    max_results varsayılanı 10→5'e düşürüldü (kredi tasarrufu).
+    Önce Tavily dene, kota dolmuşsa DuckDuckGo'ya geç.
+    DDG: API key yok, tamamen ücretsiz, gerçek sonuçlar.
     """
     global _tavily_quota_ok
     if _tavily_quota_ok:
         try:
             r = tavily_client.search(
                 query=query,
-                search_depth="basic",   # advanced→basic (2x kredi tasarrufu)
+                search_depth="basic",
                 max_results=max_results,
-                include_answer=False,   # answer kapatıldı (ekstra kredi)
+                include_answer=False,
             )
             return r.get("results", [])
         except Exception as e:
             err_str = str(e)
             if "432" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
-                logger.warning("Tavily kotası doldu, DuckDuckGo'ya geçiliyor...")
+                logger.warning("Tavily kotası doldu → DuckDuckGo'ya geçildi (ücretsiz, limitsiz)")
                 _tavily_quota_ok = False
             else:
                 logger.error(f"Tavily hata: {e}")
-                return []
-    # Fallback: DuckDuckGo
+                # Tavily başka hata verdiyse DDG'yi dene
+                return _ddg_search(query, max_results)
     return _ddg_search(query, max_results)
 
 def fetch_url_content(url: str) -> str:
@@ -240,7 +226,7 @@ def fetch_url_content(url: str) -> str:
         except Exception as e:
             if "432" in str(e) or "quota" in str(e).lower():
                 _tavily_quota_ok = False
-                logger.warning("Tavily extract kotası doldu, httpx scrape'e geçiliyor...")
+                logger.warning("Tavily extract kotası doldu → httpx scrape'e geçildi")
             else:
                 logger.error(f"URL çekme hata: {e}")
     return _httpx_scrape(url)
