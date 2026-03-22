@@ -275,26 +275,31 @@ def research_airdrop_by_url(url: str) -> dict:
 def analyze_research(data: dict) -> str:
     """AI ile araştırma verisini analiz et — sadece belgeli bilgileri yaz."""
     system = """Sen deneyimli bir kripto kazanım fırsatı araştırmacısısın.
-Görevin: Verilen HAM VERİDEN gerçek bilgileri çıkarmak.
+Görevin: HAM VERİDEN SADECE gerçek, belgeli bilgileri çıkarmak.
 
-KRİTİK KURAL: Sadece ham veride AÇIKÇA geçen bilgileri yaz.
-Rakamlar, tarihler, adımlar — hepsini KAYNAK VERİDEN al.
-Eğer ham veride geçmiyorsa o alanı "Bulunamadı" yaz — ASLA uydurma.
+KRITIK KURALLAR:
+1. SADECE ham veride geçen bilgileri yaz — asla tahmin/uydurma yapma
+2. Rakamlar ve tarihler KAYNAK metinden kopyalanacak
+3. Ham veride yoksa: "Bulunamadı" yaz
+4. Kampanya tarihi eskiyse "SONA ERMİŞ OLABİLİR" ekle
+5. Kaynak URL-lerini mutlaka yaz
 
-ÇIKART:
-PLATFORM/PROJE: (adı ve ne olduğu)
-FIRSATIN TÜRÜ: (borsa bonusu / airdrop / kampanya / referral — hangisi?)
-ÖDÜL MİKTARI: (varsa EXACT rakam — "60.000 USDT" değil, kaynakta ne yazıyorsa)
-KİMLER KATILABİLİR: (yeni kullanıcı / mevcut / herkes)
-ADIMLAR: (kaynakta yazan GERÇEK adımlar, numaralı)
-  → Her adımın ödülü varsa onu da yaz
-TOPLAM KAZANILABİLİR: (varsa)
-SON TARİH: (varsa)
-KATILABİLECEK LİNK: (varsa ham veride geçen URL)
-GÜVENİLİRLİK: ⭐⭐⭐⭐⭐ (tanınan borsa/proje ise yüksek)
-UYARI: (varsa dikkat edilmesi gereken şey — min yatırım, KYC zorunluluğu vb.)
+FORMAT:
+📌 PLATFORM/PROJE: [adı ve ne olduğu]
+🏷 FIRSATIN TÜRÜ: [borsa bonusu / airdrop / kampanya / referral]
+💰 ÖDÜL MİKTARI: [kaynaktaki EXACT rakam]
+👥 KİMLER KATILABİLİR: [yeni kullanıcı / mevcut / herkes]
+📋 ADIMLAR:
+  1. [kaynak metindeki adım] — [ödül miktarı]
+  2. [kaynak metindeki adım] — [ödül miktarı]
+  3. devam...
+💎 TOPLAM: [varsa]
+⏰ SON TARİH: [varsa — yoksa Belirtilmemiş]
+🔗 KATILIM LİNKİ: [kaynaktaki URL]
+⭐ GÜVENİLİRLİK: [1-5 yıldız + neden]
+⚠️ UYARI: [KYC / min yatırım / ülke kısıtı / SONA ERMİŞ OLABİLİR]
 
-Türkçe yaz. Uydurma yapma — yoksa "Bulunamadı" yaz."""
+Türkçe yaz. Uydurma YAPMA."""
 
     return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
 
@@ -304,7 +309,7 @@ Türkçe yaz. Uydurma yapma — yoksa "Bulunamadı" yaz."""
 # Borsa kayıt bonusu + kampanya ağırlıklı, airdrop destekli
 OPPORTUNITY_QUERIES = [
     # Borsa yeni kullanıcı bonusu — Türkçe borsalar dahil
-    ("bonus", "kripto borsa yeni kullanıcı ödülü kayıt bonusu USDT TL 2025"),
+    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü 2026 USDT TL Mart aktif"),
     ("bonus", "crypto exchange new user bonus welcome reward USDT 2025 site:binance.com OR site:bybit.com OR site:okx.com OR site:cointr.com OR site:bitlo.com"),
     ("bonus", "crypto exchange sign up reward deposit bonus free USDT 2026"),
     ("bonus", "borsa kayıt kampanyası hediye 2025 site:cointr.com OR site:paribu.com OR site:btcturk.com"),
@@ -318,8 +323,8 @@ OPPORTUNITY_QUERIES = [
     ("sosyal", "telegram crypto bot task reward earn token USDT 2025"),
     ("sosyal", "crypto project telegram task reward points 2025 airdrop"),
     # Klasik kolay airdrop
-    ("airdrop", "easy crypto airdrop 2026 free token social task discord twitter"),
-    ("airdrop", "new airdrop claim 2025 2026 galxe zealy no stake required free"),
+    ("airdrop", "crypto airdrop claim March 2026 active free no investment required"),
+    ("airdrop", "galxe zealy intract quest airdrop reward March 2026 active"),
 ]
 
 
@@ -408,42 +413,42 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
             c = item["content"]
             combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
     system = """Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
-Amacın: Sıradan bir kullanıcının GERÇEKTEN para kazanabileceği, somut rakamlı, aktif fırsatları bulmak.
+Amacın: Sıradan bir kullanıcının GERÇEKTEN para kazanabileceği, somut rakamlı, BUGÜN AKTİF fırsatları bulmak.
 
-ÖNCELİKLİ FIRSATLAR (bunları ön plana çıkar):
-🎁 Borsa kayıt bonusu — Yeni üye ol, KYC yap, işlem yap → USDT/TL kazan
-   Örnek: "Kayıt ol + 1000TL yatır → 200TL bonus"
-👥 Referral kampanyası — Arkadaşını davet et → komisyon/bonus kazan
-🏆 Trading kampanyası — Belirli hacimde işlem yap → ödül havuzundan pay al
-📱 Telegram/Discord görevi — Bot kullan, görev tamamla → token/USDT kazan
-🪂 Kolay airdrop — Sosyal takip, form doldur → token kazan
+ÖNCELİK SIRASI:
+1. 🎁 Borsa kayıt bonusu — yeni üye ol, az emekle somut TL/USDT kazan
+2. 👥 Referral kampanyası — davet et, komisyon kazan
+3. 🏆 Trading kampanyası — işlem yap, ödül al
+4. 📱 Telegram/sosyal görev — kolay görevler, token kazan
+5. 🪂 Airdrop — form doldur, sosyal takip, token kazan
 
-REDDET:
-❌ Validator/node gerektiren
-❌ 10.000$+ yatırım gerektiren
-❌ Sona ermiş kampanyalar
-❌ Bilgisi belirsiz/eksik fırsatlar
+KESİN REDDET (listeye ekleme):
+❌ Validator/node çalıştırma gerektiren
+❌ 1000$+ yatırım zorunlu olanlar
+❌ Tarihi geçmiş kampanyalar (2024 ve öncesi)
+❌ Rakamı belirsiz/eksik fırsatlar
+❌ Sadece "yakında" diyip tarih vermeyen projeler
 
-FORMAT — CoinTR örneğindeki gibi somut ve detaylı yaz:
+FORMAT (HER fırsat için AYNEN bu yapıyı kullan):
 
-🎁 *[BORSA/PLATFORM ADI]*
-├ 💰 Toplam Ödül: [somut rakam — örn: 2600 TL veya 50 USDT]
-├ 🏦 Platform: [borsa veya platform adı]
-├ 👥 Kimler: [Yeni kullanıcı / Mevcut kullanıcı / Herkes]
-├ 📋 Adımlar:
-│  1️⃣ [ilk adım → kaç TL/USDT]
-│  2️⃣ [ikinci adım → kaç TL/USDT]
-│  3️⃣ [üçüncü adım → kaç TL/USDT]
-├ ⏰ Son Tarih: [tarih veya kampanya süresi boyunca]
-├ ⭐ Güvenilirlik: [⭐⭐⭐⭐⭐]
-└ 🔗 Link: [direkt kayıt/katılım linki]
+━━━━━━━━━━━━━━━━━━━━━━
+🎁 [BORSA/PLATFORM ADI]
+┣ 💰 Ödül: [EXACT rakam — örn: 2600 TL / 50 USDT / 100 TOKEN]
+┣ 🏦 Tür: [borsa bonusu / airdrop / referral / görev]
+┣ 👥 Kimler: [yeni kullanıcı / mevcut / herkes]
+┣ 📋 Adımlar:
+┃  1️⃣ [adım] → [ödül]
+┃  2️⃣ [adım] → [ödül]
+┃  3️⃣ [adım] → [ödül]
+┣ ⏰ Son Tarih: [tarih / süre / devam ediyor]
+┣ ⭐ Güvenilirlik: [⭐⭐⭐⭐⭐]
+┗ 🔗 [kayıt/katılım URL]
 
 KURALLAR:
-- Rakamlar somut olsun: "2600 TL", "50 USDT", "25$ bonus" gibi
-- Adımlar numaralı ve net olsun
-- Eksik bilgi varsa o fırsatı ATLA — asla "?" yazma
-- 5-8 fırsat listele, kaliteli ve gerçek olanları seç
-- Türkçe yaz"""
+- Somut rakam yaz: "50 USDT", "2600 TL", "500 TOKEN"
+- Kaynak veride olmayan rakamı YAZMA
+- 4-6 kaliteli fırsat listele, gereksiz olanları atla
+- Türkçe yaz, net ve anlaşılır ol"""
 
     return ai(system, combined_raw[:8000], tokens=3500)
 
@@ -451,74 +456,83 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik çarpıcı, dikkat çekici kazanım fırsatı postları yazan uzmansın.
+# ── POST_SYSTEM: Telegram HTML formatı, premium emoji destekli ───────────────
+POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik PATLATICI, görsel açıdan zengin, dikkat çekici kazanım fırsatı postları yazan uzmansın.
 
-KURAL:
+FORMAT KURALLARI:
+- Telegram HTML formatı kullan: <b>kalın</b>, <i>italik</i>
+- Hashtag (#) KESİNLİKLE yasak
+- Link için tam olarak bırak: [🔗 LİNK]
+- SADECE analizde geçen gerçek rakamları kullan — ASLA uydurma
+- 900-1200 karakter — dolu, bilgi yoğun, her satır değerli
+- Boş satır bırakma, her alan bilgi içersin
 - Türkçe yaz
-- Telegram normal Markdown (*bold*, _italic_) — MarkdownV2 KULLANMA
-- KESİNLİKLE hashtag (#) kullanma — hiçbir satırda etiket yok
-- Link için tam olarak şu metni bırak: [🔗 LİNK]
-- SADECE analizde geçen gerçek rakamları kullan — asla uydurma
-- Adımlar numaralı, her adımın yanında ödülü varsa yaz
-- Post dolup taşsın — boş alan bırakma, her bilgiyi doldur
-- Maksimum 1000 karakter
 
-ŞABLON:
+ŞABLON (AYNEN kullan, içeriği doldur):
 
-🚨 *[PLATFORM] — [KISA BAŞLIK]* 🚨
+🚨🔥 <b>[PLATFORM ADI] — [ÇARPICI BAŞLIK]</b> 🔥🚨
 
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-🎁 *Yeni Kullanıcı Ödülü:* [rakam + birim]
-🔄 *Mevcut Kullanıcı:* [rakam varsa — yoksa satırı sil]
-👤 *Kimler:* [yeni üye / herkes / ülke kısıtı]
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+╔══════════════════════╗
+💎 <b>TOPLAM ÖDÜL: [RAKAM + BİRİM]</b>
+╚══════════════════════╝
 
-✅ *Nasıl Kazanılır?*
-1️⃣ [adım] → [ödül miktarı]
-2️⃣ [adım] → [ödül miktarı]
-3️⃣ [adım] → [ödül miktarı]
-4️⃣ [adım] → [ödül miktarı]
+🎁 <b>Yeni Üye Bonusu:</b> <b>[rakam]</b>
+🔄 <b>Mevcut Kullanıcı:</b> <b>[rakam — yoksa bu satırı sil]</b>
+👤 <b>Kimler:</b> [yeni üye / herkes / ülke kısıtı]
+⚡ <b>Zorluk:</b> [Kolay / Orta] | ⏱ <b>Süre:</b> [tahmini süre]
 
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-💎 *Toplam Kazanılabilir:* [toplam rakam]
-⏳ *Son Tarih:* [tarih veya kampanya süresi boyunca]
-⚠️ *Dikkat:* [min yatırım / KYC / kısıt — yoksa satırı sil]
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+━━━━━━━━━━━━━━━━━━━━━━
 
-🔥 *Hemen Katıl — Kontenjan Dolmadan!*
+✅ <b>ADIM ADIM KAZANÇ REHBERİ:</b>
+
+1️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
+2️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
+3️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
+4️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+⏳ <b>Son Tarih:</b> [tarih veya "Kampanya süresi boyunca"]
+⚠️ <b>Dikkat:</b> [min yatırım / KYC zorunlu / ülke kısıtı]
+🛡 <b>Platform:</b> [borsa/proje türü] | ⭐⭐⭐⭐⭐
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 <b>KONTENJAN DOLMADAN HEMEN KATIL!</b>
 👉 [🔗 LİNK]
 
-_⚡ Bu fırsatı kaçırma — arkadaşlarınla da paylaş!_"""
+<i>💬 Arkadaşlarına ilet — birlikte kazan!</i>"""
 
-# ── Post sistem promptları ─────────────────────────────────────────────
-
-POST_SYSTEM_SHORT = """Sen Telegram için KISA ve öz kripto fırsat postları yazıyorsun.
+# ── Kısa format ───────────────────────────────────────────────────────────────
+POST_SYSTEM_SHORT = """Sen Telegram için KISA ve etkili kripto fırsat postları yazıyorsun.
 KURAL:
-- Türkçe, normal Markdown (*bold*, _italic_)
-- Hashtag (#) KULLANMA
-- Maksimum 400 karakter — kısa tut
+- Telegram HTML: <b>kalın</b>, <i>italik</i>
+- Hashtag (#) YOK
+- Maksimum 500 karakter
 - Link için: [🔗 LİNK]
 - Sadece analizde geçen gerçek rakamları kullan
 
 ŞABLON:
-💥 *[PLATFORM] — [BAŞLIK]*
+💥🔥 <b>[PLATFORM] — [BAŞLIK]</b> 🔥💥
 
-💰 *Ödül:* [rakam]
-✅ [en önemli 1-2 adım]
+💰 <b>Ödül:</b> <b>[rakam]</b>
+✅ [adım 1] → <b>[ödül]</b>
+✅ [adım 2] → <b>[ödül]</b>
 
+⏳ Son Tarih: [tarih]
 👉 [🔗 LİNK]
-_⚡ Hızlı ol!_"""
+<i>⚡ Hızlı ol, kaçırma!</i>"""
 
-POST_SYSTEM_SUMMARY = """Sen Telegram için tek satır kripto fırsat özeti yazıyorsun.
+# ── Özet format ───────────────────────────────────────────────────────────────
+POST_SYSTEM_SUMMARY = """Sen Telegram için ultra kısa kripto fırsat özeti yazıyorsun.
 KURAL:
-- Türkçe
-- Tek mesaj, 1-3 satır MAX
-- Hashtag (#) KULLANMA
-- Link için: [🔗 LİNK]
-- Sadece analizde geçen gerçek rakamları kullan
+- Telegram HTML: <b>kalın</b>
+- 2-3 satır MAX
+- Hashtag YOK, link için: [🔗 LİNK]
+- Sadece gerçek rakam
 
 FORMAT:
-🎁 *[PLATFORM]* — [ödül miktarı] kazan! [1 cümle nasıl]. 👉 [🔗 LİNK]"""
+🎁 <b>[PLATFORM]</b> — <b>[rakam]</b> kazan! [1 cümle nasıl]. ⏳ [son tarih] 👉 [🔗 LİNK]"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -526,23 +540,22 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"Platform/Proje: {project_name}\n\n"
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
         f"=== TALİMAT ===\n"
-        f"Yukarıdaki ANALİZ VERİSİNİ kullanarak post oluştur.\n"
-        f"SADECE analizde geçen rakam ve bilgileri kullan — uydurma yapma.\n"
-        f"Ödül miktarı bulunamadıysa o satırı kaldır."
+        f"Yukarıdaki ANALİZ VERİSİNİ kullanarak Telegram HTML post oluştur.\n"
+        f"SADECE analizde geçen rakam ve bilgileri kullan.\n"
+        f"Ödül miktarı/son tarih bulunamadıysa o satırı tamamen kaldır.\n"
+        f"Şablondaki yapıyı koruyarak doldur, boş alan bırakma."
     )
 
 
 def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
-    """
-    fmt: "long" | "short" | "summary"
-    """
+    """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=450, temp=0.5)
+        return ai(POST_SYSTEM_SHORT, prompt, tokens=550, temp=0.5)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.5)
+        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=250, temp=0.5)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1000, temp=0.5)
+        return ai(POST_SYSTEM, prompt, tokens=1400, temp=0.5)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -578,17 +591,46 @@ def post_actions(has_link: bool = False, fmt: str = "long") -> InlineKeyboardMar
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-def safe_md(text: str) -> str:
-    """Markdown parse hatalarına karşı temizle, hashtag kaldır."""
+# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
+# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+CE = {
+    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
+    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
+    "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
+    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
+    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
+    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
+    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
+    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
+    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
+    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
+}
+
+def html_escape(text: str) -> str:
+    """HTML özel karakterlerini kaçır."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def md_to_html(text: str) -> str:
+    """AI'nin ürettiği Markdown benzeri metni Telegram HTML'e çevir."""
     import re
-    text = text.replace("**", "*")
-    # Satır başındaki hashtag satırlarını temizle
-    text = re.sub(r'(?m)^#\w[\w\s#]*$', "", text)
-    # Satır içi hashtag'leri kaldır
+    # Hashtag temizle
+    text = re.sub(r'(?m)^#+\s.*$', "", text)
     text = re.sub(r'#\w+', "", text)
+    # **bold** → <b>bold</b>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    # *bold* → <b>bold</b>
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
+    # _italic_ → <i>italic</i>
+    text = re.sub(r'_(.+?)_', r'<i>\1</i>', text)
+    # `code` → <code>code</code>
+    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
     # Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
     return text.strip()
+
+def safe_md(text: str) -> str:
+    """Geriye dönük uyumluluk — artık HTML döndürür."""
+    return md_to_html(text)
 
 # ══════════════════════════════════════════════════════════
 #  KOMUTLAR
@@ -602,7 +644,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⛔ Bu bot yalnızca admin DM'inden kullanılabilir.\n\n"
             f"🆔 Senin ID'n: `{user_id}`\n"
             f"Eğer admin sensin Railway Variables'da `ADMIN_CHAT_ID = {user_id}` yap.",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         return
     context.user_data.clear()
@@ -614,7 +656,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📢 *Gruba Gönder* → Hazır postu gruba gönder\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
         "💡 _Airdrop adı veya linki direkt yazabilirsin._",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=main_menu(),
     )
 
@@ -633,7 +675,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━━\n\n"
         "⚠️ Post hazır olunca *🔗 Link Ekle* butonuna bas,\n"
         "linki yapıştır — post'a otomatik eklenir.",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
     )
 
 @admin_only
@@ -641,7 +683,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔍 *Hangi kategoriyi tarayalım?*\n\n"
         "_Hepsi → tüm kategoriler taranır (daha uzun sürer)_",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=category_filter_menu(),
     )
 
@@ -650,7 +692,7 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "⚠️ Kullanım: `/post [airdrop adı]`\nÖrnek: `/post Arbitrum`",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         return
     name = " ".join(context.args)
@@ -682,7 +724,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "⚠️ Format hatalı. Şöyle yaz:\n"
                 "`PLATFORM_ADI | https://link.com`",
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
             )
             return
         platform_name, url = parts
@@ -693,7 +735,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🏦 Platform: *{lnk['platform']}*\n"
             f"🌐 URL: `{lnk['url'][:60]}`\n\n"
             f"Artık *🔗 Linklerimi Yönet* menüsünden postlara ekleyebilirsin.",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=main_menu(),
         )
         return
@@ -711,7 +753,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         platform = context.user_data.get("last_post_platform", "crypto")
         await update.message.reply_text(
             "✅ *Link eklendi!* Görsel aranıyor...",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         img_url = get_image(f"{platform} crypto")
         caption = safe_md(updated[:1024] if len(updated) > 1024 else updated)
@@ -721,7 +763,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_photo(
                     photo=img_url,
                     caption=caption,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=ParseMode.HTML,
                     reply_markup=post_actions(has_link=True),
                 )
             except Exception:
@@ -734,7 +776,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     preview = preview[:4086] + "_"
                 await update.message.reply_text(
                     preview,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=ParseMode.HTML,
                     reply_markup=post_actions(has_link=True),
                 )
         else:
@@ -746,7 +788,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 preview = preview[:4086] + "_"
             await update.message.reply_text(
                 preview,
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
                 reply_markup=post_actions(has_link=True),
             )
         return
@@ -757,7 +799,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["final_post"] = text
         await update.message.reply_text(
             "✅ *Post güncellendi!*",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=post_actions(),
         )
         return
@@ -772,31 +814,31 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         "🔬 *Derin araştırma başlıyor...*\n\n"
         f"📌 Girdi: `{input_text[:80]}`\n\n"
         "_Bu işlem 20-40 saniye sürebilir..._",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
     )
     await update.effective_chat.send_action(ChatAction.TYPING)
 
     # 1. Araştır
     if is_url(input_text):
-        await msg.edit_text("🔗 *URL içeriği çekiliyor...*", parse_mode=ParseMode.MARKDOWN)
+        await msg.edit_text("🔗 *URL içeriği çekiliyor...*", parse_mode=ParseMode.HTML)
         data = research_airdrop_by_url(input_text)
     else:
         await msg.edit_text(
             f"🔍 *'{input_text}' için derin arama yapılıyor...*\n_3 farklı sorgu çalışıyor..._",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         data = research_airdrop_by_name(input_text)
 
     project_name = data.get("name", input_text)
 
     # 2. Analiz et
-    await msg.edit_text("🤖 *AI analizi yapılıyor...*", parse_mode=ParseMode.MARKDOWN)
+    await msg.edit_text("🤖 *AI analizi yapılıyor...*", parse_mode=ParseMode.HTML)
     analysis = analyze_research(data)
     context.user_data["last_analysis"] = analysis
     context.user_data["last_project"] = project_name
 
     # 3. Post oluştur
-    await msg.edit_text("✍️ *Telegram postu yazılıyor...*", parse_mode=ParseMode.MARKDOWN)
+    await msg.edit_text("✍️ *Telegram postu yazılıyor...*", parse_mode=ParseMode.HTML)
     post = build_post(analysis, project_name)
     context.user_data["last_post"] = post
     context.user_data["final_post"] = post
@@ -812,7 +854,7 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     if len(analysis_msg) > 4000:
         analysis_msg = analysis_msg[:3990] + "\n_...devamı kırpıldı_"
 
-    await msg.edit_text(analysis_msg, parse_mode=ParseMode.MARKDOWN)
+    await msg.edit_text(analysis_msg, parse_mode=ParseMode.HTML)
 
     # 5. Postu göster
     post_preview = (
@@ -830,7 +872,7 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     context.user_data["post_fmt"]   = "long"
     await update.effective_message.reply_text(
         post_preview,
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
         reply_markup=post_actions(has_link=False, fmt="long"),
     )
 
@@ -856,29 +898,29 @@ async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, wit
                     chat_id=GROUP_CHAT_ID,
                     photo=img_url,
                     caption=safe_md(caption),
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=ParseMode.HTML,
                 )
             else:
                 await context.bot.send_message(
                     chat_id=GROUP_CHAT_ID,
                     text=safe_md(post),
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=ParseMode.HTML,
                 )
         else:
             await context.bot.send_message(
                 chat_id=GROUP_CHAT_ID,
                 text=safe_md(post),
-                parse_mode=ParseMode.MARKDOWN,
+                parse_mode=ParseMode.HTML,
             )
 
         confirm = "✅ *Post gruba gönderildi!*" + (" 🖼️ (görsel ile)" if with_photo else "")
         target = update.callback_query.message if update.callback_query else update.message
-        await target.reply_text(confirm, parse_mode=ParseMode.MARKDOWN, reply_markup=main_menu())
+        await target.reply_text(confirm, parse_mode=ParseMode.HTML, reply_markup=main_menu())
 
     except Exception as e:
         logger.error(f"Gönderme hatası: {e}")
         target = update.callback_query.message if update.callback_query else update.message
-        await target.reply_text(f"❌ Gönderim hatası: `{e}`", parse_mode=ParseMode.MARKDOWN)
+        await target.reply_text(f"❌ Gönderim hatası: `{e}`", parse_mode=ParseMode.HTML)
 
 # ══════════════════════════════════════════════════════════
 #  CALLBACK BUTONLAR
@@ -893,7 +935,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "home":
         await q.message.reply_text(
             "🏠 *Ana Menü*",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=main_menu(),
         )
 
@@ -904,13 +946,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/post `[isim]` — Araştır & post oluştur\n"
             "/sendgroup — Son postu gruba gönder\n\n"
             "💡 Direkt airdrop adı veya link yazabilirsin.",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
 
     elif data == "scan":
         msg = await q.message.reply_text(
             "🌐 *Taranıyor...*\n_Tüm kripto fırsatları aranıyor (30-50 sn)_",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         await update.effective_chat.send_action(ChatAction.TYPING)
         result = scan_active_airdrops()
@@ -924,7 +966,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"✅ *FIRSATLAR TARANDII*\n\n{safe_md(result)}"
         if len(text) > 4096:
             text = text[:4086] + "_"
-        await msg.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+        await msg.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
     elif data == "manual_post":
         context.user_data["waiting_for"] = None
@@ -934,7 +976,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• Airdrop / proje adı\n"
             "• Airdrop URL'si\n\n"
             "_Örnek: `Arbitrum` veya `https://arbitrum.io/airdrop`_",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
 
     elif data == "add_link":
@@ -954,7 +996,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await q.message.reply_text(
             text_msg,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=kb,
         )
 
@@ -962,7 +1004,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _send_to_group(update, context, with_photo=False)
 
     elif data == "send_photo":
-        await q.message.reply_text("🖼️ Görsel aranıyor...", parse_mode=ParseMode.MARKDOWN)
+        await q.message.reply_text("🖼️ Görsel aranıyor...", parse_mode=ParseMode.HTML)
         await _send_to_group(update, context, with_photo=True)
 
     elif data == "regen_post":
@@ -975,7 +1017,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet"}
         msg = await q.message.reply_text(
             f"♻️ *{fmt_label.get(fmt,'Post')} yeniden yazılıyor...*",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         post = build_post(analysis, project, fmt=fmt)
         context.user_data["last_post"]   = post
@@ -989,7 +1031,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             preview = preview[:4086] + "_"
         await msg.edit_text(
             preview,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=post_actions(has_link=False, fmt=fmt),
         )
 
@@ -1005,7 +1047,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer(f"{fmt_label[fmt]} format seçildi...")
         msg = await q.message.reply_text(
             f"{fmt_label[fmt]} *format hazırlanıyor...*",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         post = build_post(analysis, project, fmt=fmt)
         context.user_data["last_post"]  = post
@@ -1023,7 +1065,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             preview = preview[:4086] + "_"
         await msg.edit_text(
             preview,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=post_actions(has_link=False, fmt=fmt),
         )
 
@@ -1032,7 +1074,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔍 *Hangi kategoriyi tarayalım?*\n\n"
             "Sadece belirli bir türü taramak için seç.\n"
             "_Hepsi → tüm kategoriler taranır (daha uzun sürer)_",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=category_filter_menu(),
         )
 
@@ -1042,7 +1084,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cat_label, _ = CATEGORY_DEFS.get(cat_key, ("🌐 Hepsi", None))
         msg = await q.message.reply_text(
             f"🌐 *{cat_label} taranıyor...*\n_30-50 saniye sürebilir_",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
         await update.effective_chat.send_action(ChatAction.TYPING)
         result = scan_active_airdrops(cats=cats)
@@ -1057,14 +1099,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"✅ *{cat_label.upper()} TARAMASI TAMAMLANDI*\n\n{safe_md(result)}"
         if len(text) > 4096:
             text = text[:4086] + "_"
-        await msg.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+        await msg.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
     # ── Link Yönetimi ─────────────────────────────────────────────────
     elif data == "link_stats":
         stats = get_link_stats()
         await q.message.reply_text(
             stats,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔗 Linklerimi Yönet", callback_data="link_manage"),
                 InlineKeyboardButton("🏠 Ana Menü", callback_data="home"),
@@ -1075,7 +1117,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.message.reply_text(
             "🔗 *KAYIT LİNKLERİM*\n\nBir linki seçerek posta ekleyebilirsin.\n"
             "Yeni link eklemek için *➕ Yeni Link Ekle*'ye bas.",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=get_link_list_menu(),
         )
 
@@ -1086,7 +1128,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Şu formatta yaz:\n"
             "`PLATFORM_ADI | https://link.com/referral`\n\n"
             "_Örnek: `CoinTR | https://partner.cointr.com/short/abc`_",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
 
     elif data.startswith("link_use_"):
@@ -1114,7 +1156,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             preview = preview[:4086] + "_"
         await q.message.reply_text(
             preview,
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=post_actions(has_link=True, fmt=fmt),
         )
 
@@ -1123,7 +1165,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("🗑️ Tüm linkler silindi.", show_alert=True)
         await q.message.reply_text(
             "🗑️ Kayıtlı tüm linkler silindi.",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=main_menu(),
         )
 
@@ -1131,7 +1173,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for"] = None
         await q.message.reply_text(
             "🔬 *Yeni araştırma için airdrop adı veya linkini yaz:*",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
         )
 
 # ══════════════════════════════════════════════════════════
@@ -1151,7 +1193,7 @@ async def auto_scan_job(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
             text=f"🔔 *OTOMATİK TARAMA* — _{ts}_\n\n_Airdrop · Borsa bonusu · Kampanya · Testnet · NFT_\n\n{safe_md(result)}",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
     except Exception as e:
