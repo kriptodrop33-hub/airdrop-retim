@@ -1227,25 +1227,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #  OTOMATİK TARAMA — Her 8 Saatte Bir Admin'e Bildir
 # ══════════════════════════════════════════════════════════
 
-async def auto_scan_job(context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Otomatik tarama başladı...")
-    result = scan_active_airdrops()
-    ts = datetime.now().strftime("%d.%m.%Y %H:%M")
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
-    ])
-
-    try:
-        await context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID,
-            text=f"🔔 *OTOMATİK TARAMA* — _{ts}_\n\n_Airdrop · Borsa bonusu · Kampanya · Testnet · NFT_\n\n{safe_md(result)}",
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
-        )
-    except Exception as e:
-        logger.error(f"Auto scan bildirim hata: {e}")
-
 # ══════════════════════════════════════════════════════════
 #  ANA
 # ══════════════════════════════════════════════════════════
@@ -1261,9 +1242,6 @@ def main():
 
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Otomatik tarama: 8 saatte bir
-    app.job_queue.run_repeating(auto_scan_job, interval=28800, first=120)
 
     logger.info("🚀 Airdrop Bot başlatıldı.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
