@@ -518,94 +518,84 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Telegram HTML formatı, premium emoji destekli ───────────────
-POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik PATLATICI, görsel açıdan zengin, dikkat çekici kazanım fırsatı postları yazan uzmansın.
+# ── POST_SYSTEM: Sıkı anti-hallucination kuralları ───────────────────────────
+POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik dikkat çekici kazanım fırsatı postları yazan uzmansın.
 
-FORMAT KURALLARI:
-- Telegram HTML formatı kullan: <b>kalın</b>, <i>italik</i>
-- Hashtag (#) KESİNLİKLE yasak
-- Link için tam olarak bırak: [🔗 LİNK]
-- SADECE analizde geçen gerçek rakamları kullan — ASLA uydurma
-- 900-1200 karakter — dolu, bilgi yoğun, her satır değerli
-- Boş satır bırakma, her alan bilgi içersin
-- Türkçe yaz
+⛔ KESİN YASAKLAR — İHLAL ETME:
+1. Analizde YAZMAYANRAKAM, KOD, URL yazma — yoksa o satırı komple sil
+2. Referral kodu, davet kodu, promo kodu ASLA yazma (örnek bile olsa)
+3. Adım başına ödül miktarı analizde yoksa → sadece adımı yaz, rakam ekleme
+4. Toplam ödül analizde net yoksa → "Kampanya ödülü" yaz, rakam uydurma
+5. Hashtag (#) yasak
+6. Link için sadece: [🔗 LİNK]
+7. Türkçe yaz, Telegram HTML: <b>kalın</b>, <i>italik</i>
 
-ŞABLON (AYNEN kullan, içeriği doldur):
+✅ YAPILACAKLAR:
+- Analizde geçen GERÇEK rakamları kullan
+- Gerçek adımları yaz (kayıt, KYC, yatırım, işlem vb.)
+- Net bilgi yoksa o satırı sil, doldurmaya çalışma
+- 700-1000 karakter arası tut
 
-🚨🔥 <b>[PLATFORM ADI] — [ÇARPICI BAŞLIK]</b> 🔥🚨
+YAPI (içerik yoksa satırı komple çıkar):
 
-╔══════════════════════╗
-💎 <b>TOPLAM ÖDÜL: [RAKAM + BİRİM]</b>
-╚══════════════════════╝
+🚀 <b>[PLATFORM] — [KISA BAŞLIK]</b>
 
-🎁 <b>Yeni Üye Bonusu:</b> <b>[rakam]</b>
-🔄 <b>Mevcut Kullanıcı:</b> <b>[rakam — yoksa bu satırı sil]</b>
-👤 <b>Kimler:</b> [yeni üye / herkes / ülke kısıtı]
-⚡ <b>Zorluk:</b> [Kolay / Orta] | ⏱ <b>Süre:</b> [tahmini süre]
+━━━━━━━━━━━━━━━━━━━━
+💰 <b>Ödül:</b> [analizde geçen rakam — yoksa "Kampanya ödülü"]
+👤 <b>Kimler:</b> [yeni üye / mevcut / herkes]
+⏳ <b>Son Tarih:</b> [tarih — yoksa bu satırı sil]
+━━━━━━━━━━━━━━━━━━━━
 
-━━━━━━━━━━━━━━━━━━━━━━
+✅ <b>Nasıl Katılınır:</b>
+1️⃣ [adım]
+2️⃣ [adım]
+3️⃣ [adım — yoksa sil]
+4️⃣ [adım — yoksa sil]
 
-✅ <b>ADIM ADIM KAZANÇ REHBERİ:</b>
+━━━━━━━━━━━━━━━━━━━━
+⚠️ <b>Dikkat:</b> [KYC / min yatırım / kısıt — yoksa bu satırı sil]
+🛡 <b>Platform:</b> [borsa/proje türü] ⭐⭐⭐⭐⭐
 
-1️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
-2️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
-3️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
-4️⃣ [adım açıklaması] → <b>[ödül miktarı]</b>
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-⏳ <b>Son Tarih:</b> [tarih veya "Kampanya süresi boyunca"]
-⚠️ <b>Dikkat:</b> [min yatırım / KYC zorunlu / ülke kısıtı]
-🛡 <b>Platform:</b> [borsa/proje türü] | ⭐⭐⭐⭐⭐
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-🔥 <b>KONTENJAN DOLMADAN HEMEN KATIL!</b>
+🔥 <b>Hemen Katıl!</b>
 👉 [🔗 LİNK]
 
-<i>💬 Arkadaşlarına ilet — birlikte kazan!</i>"""
+<i>💬 Arkadaşlarınla paylaş!</i>"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SHORT = """Sen Telegram için KISA ve etkili kripto fırsat postları yazıyorsun.
-KURAL:
-- Telegram HTML: <b>kalın</b>, <i>italik</i>
-- Hashtag (#) YOK
-- Maksimum 500 karakter
-- Link için: [🔗 LİNK]
-- Sadece analizde geçen gerçek rakamları kullan
+POST_SYSTEM_SHORT = """Sen Telegram için KISA kripto fırsat postları yazıyorsun.
 
-ŞABLON:
-💥🔥 <b>[PLATFORM] — [BAŞLIK]</b> 🔥💥
+⛔ YASAKLAR: Referral/promo kodu yazma, uydurma rakam yazma, hashtag yasak.
+✅ SADECE analizde geçen bilgileri kullan. Yoksa o satırı sil.
+Link: [🔗 LİNK] | HTML: <b>kalın</b> | Maks 400 karakter | Türkçe
 
-💰 <b>Ödül:</b> <b>[rakam]</b>
-✅ [adım 1] → <b>[ödül]</b>
-✅ [adım 2] → <b>[ödül]</b>
-
-⏳ Son Tarih: [tarih]
+YAPI:
+🚀 <b>[PLATFORM] — [BAŞLIK]</b>
+💰 <b>Ödül:</b> [rakam veya "Kampanya ödülü"]
+✅ [adım 1]
+✅ [adım 2]
+⏳ [son tarih — yoksa sil]
 👉 [🔗 LİNK]
-<i>⚡ Hızlı ol, kaçırma!</i>"""
+<i>⚡ Kaçırma!</i>"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SUMMARY = """Sen Telegram için ultra kısa kripto fırsat özeti yazıyorsun.
-KURAL:
-- Telegram HTML: <b>kalın</b>
-- 2-3 satır MAX
-- Hashtag YOK, link için: [🔗 LİNK]
-- Sadece gerçek rakam
+POST_SYSTEM_SUMMARY = """Sen Telegram için 2-3 satır kripto fırsat özeti yazıyorsun.
+⛔ Uydurma rakam, referral kodu yasak. Analizde yoksa yazma.
+HTML: <b>kalın</b> | Hashtag yok | Link: [🔗 LİNK] | Türkçe
 
 FORMAT:
-🎁 <b>[PLATFORM]</b> — <b>[rakam]</b> kazan! [1 cümle nasıl]. ⏳ [son tarih] 👉 [🔗 LİNK]"""
+🚀 <b>[PLATFORM]</b> — [ödül veya "kampanya"]. [1 cümle nasıl katılınır]. 👉 [🔗 LİNK]"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
     return (
         f"Platform/Proje: {project_name}\n\n"
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
-        f"=== TALİMAT ===\n"
-        f"Yukarıdaki ANALİZ VERİSİNİ kullanarak Telegram HTML post oluştur.\n"
-        f"SADECE analizde geçen rakam ve bilgileri kullan.\n"
-        f"Ödül miktarı/son tarih bulunamadıysa o satırı tamamen kaldır.\n"
-        f"Şablondaki yapıyı koruyarak doldur, boş alan bırakma."
+        f"=== KESİN KURALLAR ===\n"
+        f"1. SADECE yukarıdaki analizde AÇIKÇA geçen rakamları kullan\n"
+        f"2. Referral kodu, promo kodu, davet kodu YAZMA — analizde varsa bile\n"
+        f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
+        f"4. Adımları analizden al, kendin adım uydurma\n"
+        f"5. [🔗 LİNK] placeholder'ını koru — URL yazma"
     )
 
 
@@ -613,11 +603,11 @@ def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
     """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=550, temp=0.5)
+        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=250, temp=0.5)
+        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1400, temp=0.5)
+        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
