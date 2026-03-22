@@ -152,30 +152,98 @@ AIRDROP_DOMAINS = [
     "blockworks.co", "twitter.com", "x.com", "medium.com", "mirror.xyz"
 ]
 
-def deep_search(query: str, max_results: int = 10) -> list[dict]:
-    """Tavily advanced search – tüm kaynakları tara."""
+def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
+    """
+    Ücretsiz DuckDuckGo arama — Tavily kotası dolunca devreye girer.
+    API key gerektirmez.
+    """
     try:
-        r = tavily_client.search(
-            query=query,
-            search_depth="advanced",
-            max_results=max_results,
-            include_answer=True,
+        r = requests.get(
+            "https://api.duckduckgo.com/",
+            params={"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"},
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"}
         )
-        return r.get("results", [])
+        data = r.json()
+        results = []
+        # RelatedTopics varsa al
+        for item in data.get("RelatedTopics", [])[:max_results]:
+            if "Text" in item and "FirstURL" in item:
+                results.append({
+                    "title":   item.get("Text","")[:100],
+                    "url":     item.get("FirstURL",""),
+                    "content": item.get("Text",""),
+                })
+        # AbstractText varsa ekle
+        if data.get("AbstractText"):
+            results.insert(0, {
+                "title":   data.get("Heading",""),
+                "url":     data.get("AbstractURL",""),
+                "content": data.get("AbstractText",""),
+            })
+        return results
     except Exception as e:
-        logger.error(f"Tavily hata: {e}")
+        logger.error(f"DDG hata: {e}")
         return []
 
-def fetch_url_content(url: str) -> str:
-    """URL içeriğini Tavily extract ile çek."""
+def _httpx_scrape(url: str) -> str:
+    """Basit HTTP scrape — Tavily extract kotası dolunca fallback."""
     try:
-        r = tavily_client.extract(urls=[url])
-        results = r.get("results", [])
-        if results:
-            return results[0].get("raw_content", "")[:3000]
+        r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            # HTML taglarını temizle
+            text = re.sub(r'<[^>]+>', ' ', r.text)
+            text = re.sub(r'\s+', ' ', text)
+            return text[:3000]
     except Exception as e:
-        logger.error(f"URL çekme hata: {e}")
+        logger.debug(f"Scrape hata: {e}")
     return ""
+
+# Tavily kota durumunu takip et
+_tavily_quota_ok = True
+
+def deep_search(query: str, max_results: int = 5) -> list[dict]:
+    """
+    Önce Tavily dene, kota dolmuşsa (432) DuckDuckGo'ya geç.
+    max_results varsayılanı 10→5'e düşürüldü (kredi tasarrufu).
+    """
+    global _tavily_quota_ok
+    if _tavily_quota_ok:
+        try:
+            r = tavily_client.search(
+                query=query,
+                search_depth="basic",   # advanced→basic (2x kredi tasarrufu)
+                max_results=max_results,
+                include_answer=False,   # answer kapatıldı (ekstra kredi)
+            )
+            return r.get("results", [])
+        except Exception as e:
+            err_str = str(e)
+            if "432" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
+                logger.warning("Tavily kotası doldu, DuckDuckGo'ya geçiliyor...")
+                _tavily_quota_ok = False
+            else:
+                logger.error(f"Tavily hata: {e}")
+                return []
+    # Fallback: DuckDuckGo
+    return _ddg_search(query, max_results)
+
+def fetch_url_content(url: str) -> str:
+    """URL içeriğini çek — Tavily extract, yoksa httpx scrape."""
+    global _tavily_quota_ok
+    if _tavily_quota_ok:
+        try:
+            r = tavily_client.extract(urls=[url])
+            results = r.get("results", [])
+            if results:
+                return results[0].get("raw_content", "")[:3000]
+        except Exception as e:
+            if "432" in str(e) or "quota" in str(e).lower():
+                _tavily_quota_ok = False
+                logger.warning("Tavily extract kotası doldu, httpx scrape'e geçiliyor...")
+            else:
+                logger.error(f"URL çekme hata: {e}")
+    return _httpx_scrape(url)
 
 def is_url(text: str) -> bool:
     return bool(re.match(r"https?://\S+", text.strip()))
@@ -205,19 +273,21 @@ def get_image(query: str = "cryptocurrency airdrop") -> str | None:
 
 def research_airdrop_by_name(name: str) -> dict:
     """
-    Platform/proje adına göre derin araştırma.
-    Borsa bonusu, airdrop, kampanya — her türü kapsar.
+    Platform/proje adına göre araştırma.
+    Tavily: 3 sorgu × 4 sonuç = 12 istek (eski: 5×5=25)
     """
+    # Sadece en etkili 3 sorgu — kredi tasarrufu
     queries = [
-        f"{name} yeni kullanıcı bonusu kayıt ödülü nasıl alınır 2025 2026",
-        f"{name} new user bonus sign up reward how to claim 2025 2026",
-        f"{name} airdrop campaign tasks eligibility reward amount",
-        f"{name} referral program bonus USDT earn invite",
-        f"{name} crypto promotion trading reward deposit bonus",
+        f"{name} new user bonus reward how to claim 2026",
+        f"{name} airdrop tasks eligibility reward amount 2026",
+        f"{name} kripto kampanya kayıt bonusu nasıl alınır",
     ]
     all_results = []
     for q in queries:
-        all_results.extend(deep_search(q, max_results=5))
+        hits = deep_search(q, max_results=4)
+        all_results.extend(hits)
+        if len(all_results) >= 10:
+            break  # Yeterli sonuç varsa devam etme
 
     # Tekrar edenleri filtrele
     seen_urls = set()
@@ -228,23 +298,22 @@ def research_airdrop_by_name(name: str) -> dict:
             seen_urls.add(url)
             unique.append(item)
 
-    # Uzun içerik — 1200 karakter/kaynak
     raw_text = "\n\n".join([
         f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:1200]}"
-        for i, r in enumerate(unique[:12])
+        for i, r in enumerate(unique[:8])
     ])
 
-    # En alakalı sayfanın tam içeriğini de çek
+    # En alakalı sayfanın içeriğini çek (1 kredi)
     if unique:
         best_url = unique[0].get("url", "")
         try:
             full = fetch_url_content(best_url)
             if full:
-                raw_text = f"=== TAM SAYFA İÇERİĞİ ({best_url}) ===\n{full[:3000]}\n\n=== DİĞER KAYNAKLAR ===\n{raw_text}"
+                raw_text = f"=== TAM SAYFA ({best_url}) ===\n{full[:2500]}\n\n=== DİĞER KAYNAKLAR ===\n{raw_text}"
         except Exception:
             pass
 
-    return {"name": name, "raw": raw_text, "sources": unique[:12]}
+    return {"name": name, "raw": raw_text, "sources": unique[:8]}
 
 
 def research_airdrop_by_url(url: str) -> dict:
@@ -356,13 +425,18 @@ def category_filter_menu() -> InlineKeyboardMarkup:
 def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
     """
     Tavily araması — cats verilirse sadece o kategorileri tara.
-    cats=None → hepsi
+    Her kategoriden en iyi 1 sorgu kullan (kredi tasarrufu).
     """
-    seen_urls = set()
-    results = []
+    seen_urls  = set()
+    results    = []
+    # Kategori başına sadece EN İYİ 1 sorgu çalıştır
+    seen_cats  = set()
     for category, query in OPPORTUNITY_QUERIES:
         if cats and category not in cats:
             continue
+        if category in seen_cats:
+            continue  # Her kategoriden tek sorgu
+        seen_cats.add(category)
         hits = deep_search(query, max_results=4)
         for r in hits:
             url = r.get("url", "")
@@ -375,6 +449,8 @@ def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
                 "url":      url,
                 "content":  r.get("content", "")[:1200],
             })
+        if len(results) >= 20:
+            break  # Yeterli sonuç var, devam etme
     return results
 
 
