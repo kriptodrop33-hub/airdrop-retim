@@ -694,72 +694,77 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Sıkı anti-hallucination kuralları ───────────────────────────
-POST_SYSTEM = """Sen Telegram kripto topluluklarına yönelik dikkat çekici kazanım fırsatı postları yazan uzmansın.
+# ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
+POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
 
-⛔ KESİN YASAKLAR — İHLAL ETME:
-1. Analizde YAZMAYANRAKAM, KOD, URL yazma — yoksa o satırı komple sil
-2. Referral kodu, davet kodu, promo kodu ASLA yazma (örnek bile olsa)
-3. Adım başına ödül miktarı analizde yoksa → sadece adımı yaz, rakam ekleme
-4. Toplam ödül analizde net yoksa → "Kampanya ödülü" yaz, rakam uydurma
-5. Hashtag (#) yasak
-6. Link için sadece: [🔗 LİNK]
-7. Türkçe yaz, Telegram HTML: <b>kalın</b>, <i>italik</i>
+⛔ KESİN YASAKLAR:
+1. Analizde OLMAYAN rakam, kod, URL yazma
+2. Referral/promo kodu ASLA yazma
+3. Hashtag (#) yasak
+4. Şablon metnini ("yoksa sil" gibi) posta bırakma
+5. Link için sadece: [🔗 TIKLA 🖊]
+6. Türkçe | HTML: <b>kalın</b>
 
-✅ YAPILACAKLAR:
-- Analizde geçen GERÇEK rakamları kullan
-- Gerçek adımları yaz (kayıt, KYC, yatırım, işlem vb.)
-- Net bilgi yoksa o satırı sil, doldurmaya çalışma
-- 700-1000 karakter arası tut
+KISALTMA KURALLARI:
+- Ödül yoksa → "Kampanya ödülü"
+- Son tarih yoksa → o satırı komple sil
+- Adım yoksa → o adımı komple sil
 
-YAPI (içerik yoksa satırı komple çıkar):
+AYNEN bu yapıyı kullan:
 
-🚀 <b>[PLATFORM] — [KISA BAŞLIK]</b>
+🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
 
-━━━━━━━━━━━━━━━━━━━━
-💰 <b>Ödül:</b> [analizde geçen rakam — yoksa "Kampanya ödülü"]
-👤 <b>Kimler:</b> [yeni üye / mevcut / herkes]
-⏳ <b>Son Tarih:</b> [tarih — yoksa bu satırı sil]
-━━━━━━━━━━━━━━━━━━━━
+[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
 
-✅ <b>Nasıl Katılınır:</b>
-1️⃣ [adım]
-2️⃣ [adım]
-3️⃣ [adım — yoksa sil]
-4️⃣ [adım — yoksa sil]
+—————————————————
+💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
+🤑 [ödül miktarı]
 
-━━━━━━━━━━━━━━━━━━━━
-⚠️ <b>Dikkat:</b> [KYC / min yatırım / kısıt — yoksa bu satırı sil]
-🛡 <b>Platform:</b> [borsa/proje türü] ⭐⭐⭐⭐⭐
+—————————————————
+🎯 <b>YAPMAN GEREKENLER:</b>
 
-🔥 <b>Hemen Katıl!</b>
-👉 [🔗 LİNK]
+🥇 [adım 1]
+🥈 [adım 2]
+🥉 [adım 3]
+🏅 [adım 4 — yoksa sil]
 
-<i>💬 Arkadaşlarınla paylaş!</i>"""
+🗓 Son gün [son tarih — yoksa bu satırı sil]
+
+—————————————————
+➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+
+<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
+<b>Ödül miktarı:</b> [rakam]
+<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+
+—————————————————
+🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
+📢 @kriptodropduyuru
+🎁 @kriptodroptr"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SHORT = """Sen Telegram için KISA kripto fırsat postları yazıyorsun.
-
-⛔ YASAKLAR: Referral/promo kodu yazma, uydurma rakam yazma, hashtag yasak.
-✅ SADECE analizde geçen bilgileri kullan. Yoksa o satırı sil.
-Link: [🔗 LİNK] | HTML: <b>kalın</b> | Maks 400 karakter | Türkçe
+POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
+⛔ Uydurma rakam, referral kodu, hashtag yasak.
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
 
 YAPI:
-🚀 <b>[PLATFORM] — [BAŞLIK]</b>
-💰 <b>Ödül:</b> [rakam veya "Kampanya ödülü"]
-✅ [adım 1]
-✅ [adım 2]
-⏳ [son tarih — yoksa sil]
-👉 [🔗 LİNK]
-<i>⚡ Kaçırma!</i>"""
+🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
+
+🤑 <b>Ödül:</b> [rakam]
+🥇 [adım 1]
+🥈 [adım 2]
+
+➡️ [🔗 TIKLA 🖊]
+📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SUMMARY = """Sen Telegram için 2-3 satır kripto fırsat özeti yazıyorsun.
-⛔ Uydurma rakam, referral kodu yasak. Analizde yoksa yazma.
-HTML: <b>kalın</b> | Hashtag yok | Link: [🔗 LİNK] | Türkçe
+POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
+⛔ Uydurma rakam, referral kodu, hashtag yasak.
+HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
 
 FORMAT:
-🚀 <b>[PLATFORM]</b> — [ödül veya "kampanya"]. [1 cümle nasıl katılınır]. 👉 [🔗 LİNK]"""
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
+📢 @kriptodropduyuru 🎁 @kriptodroptr"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -771,7 +776,7 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"2. Referral kodu, promo kodu, davet kodu YAZMA — analizde varsa bile\n"
         f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
         f"4. Adımları analizden al, kendin adım uydurma\n"
-        f"5. [🔗 LİNK] placeholder'ını koru — URL yazma"
+        f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma"
     )
 
 
@@ -976,7 +981,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for"] = None
         post = context.user_data.get("last_post", "")
         link = text.strip()
-        updated = post.replace("[🔗 LİNK]", link)
+        updated = post.replace("[🔗 TIKLA 🖊]", link)
         context.user_data["final_post"] = updated
         context.user_data["has_link"] = True
 
@@ -1433,7 +1438,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not post:
             await q.answer("⚠️ Önce bir post oluştur.", show_alert=True)
             return
-        updated = post.replace("[🔗 LİNK]", lnk["url"])
+        updated = post.replace("[🔗 TIKLA 🖊]", lnk["url"])
         context.user_data["final_post"] = updated
         context.user_data["has_link"]   = True
         record_post_use(lid)
