@@ -93,6 +93,182 @@ def get_link_list_menu() -> InlineKeyboardMarkup:
     rows.append([InlineKeyboardButton("🏠 Ana Menü", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
+
+# ══════════════════════════════════════════════════════════
+#  FIRSAT TAKİP & ARŞİV SİSTEMİ
+# ══════════════════════════════════════════════════════════
+import json, os, time as _t
+
+_DATA_FILE  = "bot_data.json"
+
+def _load_data() -> dict:
+    """JSON dosyasından veriyi yükle."""
+    if os.path.exists(_DATA_FILE):
+        try:
+            with open(_DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"tracked": {}, "posts": [], "blacklist": []}
+
+def _save_data(data: dict):
+    """Veriyi JSON dosyasına kaydet."""
+    try:
+        with open(_DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Veri kaydetme hatası: {e}")
+
+def track_opportunity(name: str, deadline: str, analysis: str, post: str):
+    """Fırsatı takibe al."""
+    data = _load_data()
+    tid  = str(int(_t.time()))
+    data["tracked"][tid] = {
+        "id":        tid,
+        "name":      name,
+        "deadline":  deadline,
+        "analysis":  analysis[:500],
+        "post":      post,
+        "added":     _t.strftime("%d.%m.%Y %H:%M"),
+        "warned":    False,
+    }
+    _save_data(data)
+    return tid
+
+def get_tracked() -> list:
+    return list(_load_data()["tracked"].values())
+
+def remove_tracked(tid: str):
+    data = _load_data()
+    data["tracked"].pop(tid, None)
+    _save_data(data)
+
+def save_post_archive(project: str, post: str, fmt: str):
+    """Postu arşive kaydet."""
+    data = _load_data()
+    entry = {
+        "id":      str(int(_t.time())),
+        "project": project,
+        "post":    post,
+        "fmt":     fmt,
+        "date":    _t.strftime("%d.%m.%Y %H:%M"),
+    }
+    data["posts"].insert(0, entry)
+    data["posts"] = data["posts"][:30]  # Son 30 post
+    _save_data(data)
+    return entry["id"]
+
+def get_post_archive() -> list:
+    return _load_data()["posts"]
+
+def get_blacklist() -> list:
+    return _load_data()["blacklist"]
+
+def add_to_blacklist(name: str):
+    data = _load_data()
+    if name.lower() not in [b.lower() for b in data["blacklist"]]:
+        data["blacklist"].append(name)
+        _save_data(data)
+
+def is_blacklisted(name: str) -> bool:
+    return any(name.lower() in b.lower() or b.lower() in name.lower()
+               for b in _load_data()["blacklist"])
+
+def check_deadlines() -> list:
+    """Son tarihi yaklaşan fırsatları döndür (3 gün veya daha az)."""
+    data   = _load_data()
+    alerts = []
+    today  = datetime.now()
+    for tid, opp in data["tracked"].items():
+        if opp.get("warned"):
+            continue
+        dl = opp.get("deadline","")
+        if not dl or dl in ("Belirtilmemiş","Bulunamadı",""):
+            continue
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                dl_dt = datetime.strptime(dl.strip(), fmt)
+                days_left = (dl_dt - today).days
+                if 0 <= days_left <= 3:
+                    alerts.append({**opp, "days_left": days_left})
+                    data["tracked"][tid]["warned"] = True
+                break
+            except Exception:
+                pass
+    _save_data(data)
+    return alerts
+
+
+def verify_and_score(name: str, initial_data: dict) -> dict:
+    """
+    Aynı projeyi 2 farklı kaynaktan daha ara, çapraz doğrula.
+    Güvenilirlik skoru hesapla.
+    """
+    # İkinci tur arama — farklı sorgular
+    extra_queries = [
+        f"{name} legit scam review reddit 2026",
+        f"{name} official website social media verified",
+    ]
+    extra_results = []
+    for q in extra_queries:
+        extra_results.extend(deep_search(q, max_results=3))
+
+    extra_text = "\n\n".join([
+        f"[DOĞRULAMA {i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:600]}"
+        for i, r in enumerate(extra_results[:6])
+    ])
+
+    combined_raw = initial_data.get("raw","") + "\n\n=== ÇAPRAZ DOĞRULAMA SONUÇLARI ===\n" + extra_text
+
+    score_system = """Sen bir kripto fırsat doğrulama uzmanısın.
+Verilen ham veriyi analiz ederek GÜVENİLİRLİK SKORU hesapla.
+
+SKOR KRİTERLERİ (0-100):
++20: Resmi web sitesi veya sosyal medya bulundu
++20: Bilinen borsa/proje (Binance, OKX, Bybit, Arbitrum vb.)
++15: Birden fazla bağımsız kaynakta aynı bilgi
++15: Net ödül miktarı ve son tarih belirtilmiş
++10: Reddit/Twitter'da pozitif yorumlar var
+-20: Yalnızca 1 kaynak bulunan bilinmez proje
+-25: "Scam", "fraud", "fake" kelimesi geçiyor
+-30: Kaynak bulunamadı veya çok az bilgi var
+-20: Son tarihi geçmiş kampanya
+
+ÇIKTI FORMAT (kesinlikle bu JSON yapısında):
+{
+  "score": 75,
+  "verdict": "GÜVENİLİR / ŞÜPHELİ / RİSKLİ",
+  "reasons": ["neden 1", "neden 2", "neden 3"],
+  "warning": "varsa uyarı metni, yoksa boş string"
+}
+
+SADECE JSON döndür, başka hiçbir şey yazma."""
+
+    result_str = ai(score_system, f"Proje: {name}\n\n{combined_raw[:5000]}", tokens=400, temp=0.1)
+
+    # JSON parse
+    try:
+        import re as _re
+        json_match = _re.search(r"\{.*\}", result_str, _re.DOTALL)
+        if json_match:
+            score_data = json.loads(json_match.group())
+        else:
+            score_data = {"score": 50, "verdict": "BELİRSİZ", "reasons": [], "warning": ""}
+    except Exception:
+        score_data = {"score": 50, "verdict": "BELİRSİZ", "reasons": [], "warning": ""}
+
+    score_data["extra_raw"] = extra_text
+    return score_data
+
+def format_score_badge(score: int, verdict: str) -> str:
+    """Skora göre rozet metni döndür."""
+    if score >= 75:
+        return f"🟢 {verdict} ({score}/100)"
+    elif score >= 50:
+        return f"🟡 {verdict} ({score}/100)"
+    else:
+        return f"🔴 {verdict} ({score}/100)"
+
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 
@@ -615,30 +791,38 @@ def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
 
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 Fırsat Tara", callback_data="scan_menu"),
-         InlineKeyboardButton("✍️ Post Oluştur", callback_data="manual_post")],
-        [InlineKeyboardButton("📊 Link İstatistik", callback_data="link_stats"),
-         InlineKeyboardButton("🔗 Linklerimi Yönet", callback_data="link_manage")],
-        [InlineKeyboardButton("🔄 Yeni Araştırma", callback_data="new_research"),
-         InlineKeyboardButton("❓ Yardım", callback_data="help")],
+        [InlineKeyboardButton("🔍 Fırsat Tara",       callback_data="scan_menu"),
+         InlineKeyboardButton("✍️ Post Oluştur",       callback_data="manual_post")],
+        [InlineKeyboardButton("📁 Post Arşivi",        callback_data="post_archive"),
+         InlineKeyboardButton("📌 Takip Listesi",      callback_data="tracked_list")],
+        [InlineKeyboardButton("🚫 Kara Liste",         callback_data="blacklist_view"),
+         InlineKeyboardButton("🔗 Linklerimi Yönet",   callback_data="link_manage")],
+        [InlineKeyboardButton("🔄 Yeni Araştırma",     callback_data="new_research"),
+         InlineKeyboardButton("❓ Yardım",              callback_data="help")],
     ])
 
 def post_actions(has_link: bool = False, fmt: str = "long") -> InlineKeyboardMarkup:
-    link_btn_label = "✅ Link Eklendi" if has_link else "🔗 Link Ekle"
-    # Format butonları — aktif olan kalın gösterilemez ama emoji ile vurgulanır
+    return post_actions_extended(has_link=has_link, fmt=fmt, score=None)
+
+def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None) -> InlineKeyboardMarkup:
+    link_label  = "✅ Link Eklendi" if has_link else "🔗 Link Ekle"
     fmt_long    = "📄 Uzun ●" if fmt == "long"    else "📄 Uzun"
     fmt_short   = "📝 Kısa ●" if fmt == "short"   else "📝 Kısa"
     fmt_summary = "⚡ Özet ●" if fmt == "summary" else "⚡ Özet"
-    return InlineKeyboardMarkup([
+    rows = [
         [InlineKeyboardButton(fmt_long,    callback_data="fmt_long"),
          InlineKeyboardButton(fmt_short,   callback_data="fmt_short"),
          InlineKeyboardButton(fmt_summary, callback_data="fmt_summary")],
-        [InlineKeyboardButton(link_btn_label, callback_data="add_link")],
-        [InlineKeyboardButton("📢 Gruba Gönder (Metin)", callback_data="send_text"),
-         InlineKeyboardButton("🖼️ Görsel ile Gönder", callback_data="send_photo")],
+        [InlineKeyboardButton(link_label,  callback_data="add_link")],
+        [InlineKeyboardButton("✏️ Postu Düzenle", callback_data="edit_post_inline")],
+        [InlineKeyboardButton("📢 Gruba Gönder",  callback_data="send_text"),
+         InlineKeyboardButton("🖼️ Görsel ile",    callback_data="send_photo")],
+        [InlineKeyboardButton("📌 Fırsatı Takibe Al", callback_data="track_opp"),
+         InlineKeyboardButton("🚫 Kara Listeye", callback_data="blacklist_opp")],
         [InlineKeyboardButton("♻️ Yenile", callback_data="regen_post"),
          InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
-    ])
+    ]
+    return InlineKeyboardMarkup(rows)
 
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
@@ -840,14 +1024,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # Post düzenleme (eski compat)
-    if waiting == "edit_post":
+    # Post düzenleme
+    if waiting in ("edit_post", "edit_post_inline"):
         context.user_data["waiting_for"] = None
-        context.user_data["final_post"] = text
+        context.user_data["final_post"]  = text
+        context.user_data["last_post"]   = text
+        fmt  = context.user_data.get("post_fmt","long")
+        preview = (
+            f"✅ <b>Post güncellendi!</b>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{safe_md(text)}\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+        if len(preview) > 4096:
+            preview = preview[:4086] + "..."
         await update.message.reply_text(
-            "✅ *Post güncellendi!*",
+            preview,
             parse_mode=ParseMode.HTML,
-            reply_markup=post_actions(),
+            reply_markup=post_actions(has_link=context.user_data.get("has_link",False), fmt=fmt),
+        )
+        return
+
+    # Takip deadline girişi
+    if waiting == "track_deadline":
+        context.user_data["waiting_for"] = None
+        deadline     = text.strip()
+        project_name = context.user_data.get("last_project","?")
+        analysis     = context.user_data.get("last_analysis","")
+        post         = context.user_data.get("final_post","")
+        tid = track_opportunity(project_name, deadline, analysis, post)
+        await update.message.reply_text(
+            f"📌 <b>{project_name}</b> takibe alındı!\n"
+            f"⏰ Son Tarih: <code>{deadline}</code>\n"
+            f"🔔 3 gün kala hatırlatma gelecek.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=main_menu(),
         )
         return
 
@@ -856,71 +1067,104 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input_text: str):
-    """Derin araştırma → AI analiz → Post oluştur."""
+    """Araştırma → Doğrulama → Güvenilirlik skoru → AI analiz → Post oluştur."""
+    # Kara liste kontrolü
+    if is_blacklisted(input_text):
+        await update.effective_message.reply_text(
+            f"🚫 <b>{input_text}</b> kara listede!\n"
+            "Bu proje daha önce sahte/şüpheli olarak işaretlendi.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=main_menu(),
+        )
+        return
+
     msg = await update.effective_message.reply_text(
-        "🔬 *Derin araştırma başlıyor...*\n\n"
-        f"📌 Girdi: `{input_text[:80]}`\n\n"
-        "_Bu işlem 20-40 saniye sürebilir..._",
+        f"🔬 <b>Araştırma başladı:</b> <code>{input_text[:60]}</code>\n"
+        "⏳ 30-60 saniye sürebilir...",
         parse_mode=ParseMode.HTML,
     )
     await update.effective_chat.send_action(ChatAction.TYPING)
 
     # 1. Araştır
     if is_url(input_text):
-        await msg.edit_text("🔗 *URL içeriği çekiliyor...*", parse_mode=ParseMode.HTML)
+        await msg.edit_text("🔗 <b>URL içeriği çekiliyor...</b>", parse_mode=ParseMode.HTML)
         data = research_airdrop_by_url(input_text)
     else:
         await msg.edit_text(
-            f"🔍 *'{input_text}' için derin arama yapılıyor...*\n_3 farklı sorgu çalışıyor..._",
+            f"🔍 <b>\'{input_text}\' araştırılıyor...</b>\n<i>Çoklu sorgu çalışıyor...</i>",
             parse_mode=ParseMode.HTML,
         )
         data = research_airdrop_by_name(input_text)
 
     project_name = data.get("name", input_text)
 
-    # 2. Analiz et
-    await msg.edit_text("🤖 *AI analizi yapılıyor...*", parse_mode=ParseMode.HTML)
-    analysis = analyze_research(data)
-    context.user_data["last_analysis"] = analysis
+    # 2. Çoklu kaynak doğrulama + güvenilirlik skoru
+    await msg.edit_text(
+        "🔁 <b>Çoklu kaynak doğrulanıyor...</b>\n<i>Güvenilirlik skoru hesaplanıyor...</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    score_data = verify_and_score(project_name, data)
+    score      = score_data.get("score", 50)
+    verdict    = score_data.get("verdict", "BELİRSİZ")
+    reasons    = score_data.get("reasons", [])
+    warning    = score_data.get("warning", "")
+    badge      = format_score_badge(score, verdict)
+
+    # Çok düşük skor → uyar ama devam et
+    context.user_data["last_score"]   = score_data
     context.user_data["last_project"] = project_name
 
-    # 3. Post oluştur
-    await msg.edit_text("✍️ *Telegram postu yazılıyor...*", parse_mode=ParseMode.HTML)
+    # 3. AI analiz
+    await msg.edit_text("🤖 <b>AI analizi yapılıyor...</b>", parse_mode=ParseMode.HTML)
+    # Doğrulama verisini de analize ekle
+    enriched_data = data.copy()
+    enriched_data["raw"] = data.get("raw","") + "\n\n=== DOĞRULAMA ===\n" + score_data.get("extra_raw","")
+    analysis = analyze_research(enriched_data)
+    context.user_data["last_analysis"] = analysis
+
+    # 4. Post oluştur
+    await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
     post = build_post(analysis, project_name)
-    context.user_data["last_post"] = post
-    context.user_data["final_post"] = post
+    context.user_data["last_post"]          = post
+    context.user_data["final_post"]         = post
     context.user_data["last_post_platform"] = project_name
+    context.user_data["has_link"]           = False
+    context.user_data["post_fmt"]           = "long"
 
-    # 4. Analizi göster
-    analysis_msg = (
-        f"📊 *ARAŞTIRMA RAPORU — {project_name.upper()}*\n\n"
-        f"{safe_md(analysis)}"
+    # Postu arşive kaydet
+    save_post_archive(project_name, post, "long")
+
+    # 5. Güvenilirlik raporunu göster
+    reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
+    score_msg = (
+        f"📊 <b>GÜVENİLİRLİK RAPORU — {project_name.upper()}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Skor: <b>{badge}</b>\n\n"
+        f"📋 <b>Değerlendirme:</b>\n{reasons_text}\n"
     )
+    if warning:
+        score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
+    score_msg += f"\n{safe_md(analysis)}"
 
-    # Uzun ise böl
-    if len(analysis_msg) > 4000:
-        analysis_msg = analysis_msg[:3990] + "\n_...devamı kırpıldı_"
+    if len(score_msg) > 4000:
+        score_msg = score_msg[:3990] + "\n<i>...kırpıldı</i>"
+    await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
 
-    await msg.edit_text(analysis_msg, parse_mode=ParseMode.HTML)
-
-    # 5. Postu göster
+    # 6. Post önizleme + aksiyon butonları
     post_preview = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📣 *HAZIRLANAN POST:*\n\n"
+        f"📣 <b>HAZIRLANAN POST:</b>\n\n"
         f"{safe_md(post)}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👇 *🔗 Link Ekle* butonuna bas, linki yapıştır, sonra gruba gönder."
+        f"Skor: {badge}"
     )
-
     if len(post_preview) > 4096:
-        post_preview = post_preview[:4086] + "_"
+        post_preview = post_preview[:4086] + "..."
 
-    context.user_data["has_link"]   = False
-    context.user_data["post_fmt"]   = "long"
     await update.effective_message.reply_text(
         post_preview,
         parse_mode=ParseMode.HTML,
-        reply_markup=post_actions(has_link=False, fmt="long"),
+        reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
     )
 
 # ══════════════════════════════════════════════════════════
@@ -1214,6 +1458,136 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🗑️ Kayıtlı tüm linkler silindi.",
             parse_mode=ParseMode.HTML,
             reply_markup=main_menu(),
+        )
+
+    elif data == "edit_post_inline":
+        context.user_data["waiting_for"] = "edit_post_inline"
+        current = context.user_data.get("final_post","")
+        await q.message.reply_text(
+            "✏️ <b>Postu Düzenle</b>\n\n"
+            "Aşağıdaki metni değiştirerek gönder:\n"
+            "<i>(Tüm metni yeniden yaz)</i>\n\n"
+            f"<code>{current[:800]}</code>",
+            parse_mode=ParseMode.HTML,
+        )
+
+    elif data == "track_opp":
+        context.user_data["waiting_for"] = "track_deadline"
+        project = context.user_data.get("last_project","?")
+        await q.message.reply_text(
+            f"📌 <b>{project}</b> takibe alınıyor...\n\n"
+            "Son tarihi gir (ör: <code>31.05.2026</code>)\n"
+            "Bilmiyorsan <code>belirsiz</code> yaz:",
+            parse_mode=ParseMode.HTML,
+        )
+
+    elif data == "blacklist_opp":
+        project = context.user_data.get("last_project","?")
+        add_to_blacklist(project)
+        await q.answer(f"🚫 {project} kara listeye eklendi!", show_alert=True)
+        await q.message.reply_text(
+            f"🚫 <b>{project}</b> kara listeye eklendi.\n"
+            "Bu proje artık arama sonuçlarında gösterilmeyecek.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=main_menu(),
+        )
+
+    elif data == "tracked_list":
+        items = get_tracked()
+        if not items:
+            await q.message.reply_text(
+                "📌 <b>Takip Listesi</b>\n\nHenüz takip edilen fırsat yok.\n"
+                "Araştırma sonrası <b>Fırsatı Takibe Al</b> butonuna bas.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]),
+            )
+        else:
+            text_msg = "📌 <b>TAKİP LİSTESİ</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+            kb = []
+            for opp in items[-8:]:
+                dl = opp.get("deadline","?")
+                text_msg += f"• <b>{opp['name']}</b> | ⏰ {dl} | 📅 {opp['added']}\n"
+                kb.append([
+                    InlineKeyboardButton(f"🗑 {opp['name'][:20]}", callback_data=f"untrack_{opp['id']}"),
+                    InlineKeyboardButton("✍️ Post", callback_data=f"repost_{opp['id']}"),
+                ])
+            kb.append([InlineKeyboardButton("🏠 Ana Menü", callback_data="home")])
+            await q.message.reply_text(text_msg, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(kb))
+
+    elif data.startswith("untrack_"):
+        tid = data[8:]
+        remove_tracked(tid)
+        await q.answer("✅ Takipten çıkarıldı.", show_alert=False)
+        # Listeyi yenile
+        items = get_tracked()
+        if not items:
+            await q.message.reply_text("📌 Takip listesi boş.", parse_mode=ParseMode.HTML, reply_markup=main_menu())
+        else:
+            text_msg = "📌 <b>TAKİP LİSTESİ (güncellendi)</b>\n\n"
+            for opp in items[-8:]:
+                text_msg += f"• <b>{opp['name']}</b> | ⏰ {opp.get('deadline','?')}\n"
+            await q.message.reply_text(text_msg, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]))
+
+    elif data.startswith("repost_"):
+        tid  = data[7:]
+        items = {o["id"]: o for o in get_tracked()}
+        opp  = items.get(tid)
+        if opp:
+            context.user_data["last_post"]  = opp.get("post","")
+            context.user_data["final_post"] = opp.get("post","")
+            context.user_data["last_project"] = opp.get("name","")
+            preview = f"📣 <b>POST:</b>\n\n{safe_md(opp.get('post',''))}"
+            if len(preview) > 4096: preview = preview[:4086] + "..."
+            await q.message.reply_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False))
+        else:
+            await q.answer("Fırsat bulunamadı.", show_alert=True)
+
+    elif data == "post_archive":
+        posts = get_post_archive()
+        if not posts:
+            await q.message.reply_text(
+                "📁 <b>Post Arşivi</b>\n\nHenüz arşivlenmiş post yok.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]),
+            )
+        else:
+            text_msg = "📁 <b>POST ARŞİVİ</b> (son 10)\n━━━━━━━━━━━━━━━━━━━━\n\n"
+            kb = []
+            for p in posts[:10]:
+                text_msg += f"• <b>{p['project']}</b> | {p['fmt']} | {p['date']}\n"
+                kb.append([InlineKeyboardButton(
+                    f"📄 {p['project'][:25]} ({p['date'][:5]})",
+                    callback_data=f"archive_load_{p['id']}"
+                )])
+            kb.append([InlineKeyboardButton("🏠 Ana Menü", callback_data="home")])
+            await q.message.reply_text(text_msg, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(kb))
+
+    elif data.startswith("archive_load_"):
+        pid   = data[13:]
+        posts = {p["id"]: p for p in get_post_archive()}
+        p     = posts.get(pid)
+        if p:
+            context.user_data["last_post"]    = p["post"]
+            context.user_data["final_post"]   = p["post"]
+            context.user_data["last_project"] = p["project"]
+            context.user_data["post_fmt"]     = p["fmt"]
+            preview = f"📄 <b>{p['project']}</b> | {p['date']}\n\n{safe_md(p['post'])}"
+            if len(preview) > 4096: preview = preview[:4086] + "..."
+            await q.message.reply_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=p["fmt"]))
+        else:
+            await q.answer("Post bulunamadı.", show_alert=True)
+
+    elif data == "blacklist_view":
+        bl = get_blacklist()
+        text_msg = "🚫 <b>KARA LİSTE</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        if bl:
+            for item in bl:
+                text_msg += f"• {item}\n"
+        else:
+            text_msg += "Kara liste boş."
+        await q.message.reply_text(
+            text_msg, parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]),
         )
 
     elif data == "new_research":
