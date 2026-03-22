@@ -637,25 +637,20 @@ def safe_md(text: str) -> str:
 # ══════════════════════════════════════════════════════════
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id   = update.effective_user.id
-    chat_type = update.effective_chat.type
-    if user_id != ADMIN_CHAT_ID or chat_type != "private":
-        await update.message.reply_text(
-            f"⛔ Bu bot yalnızca admin DM'inden kullanılabilir.\n\n"
-            f"🆔 Senin ID'n: `{user_id}`\n"
-            f"Eğer admin sensin Railway Variables'da `ADMIN_CHAT_ID = {user_id}` yap.",
-            parse_mode=ParseMode.HTML,
-        )
+    # Grup/kanal veya admin değilse sessizce yoksay
+    if update.effective_chat.type in ("group", "supergroup", "channel"):
+        return
+    if update.effective_user.id != ADMIN_CHAT_ID:
         return
     context.user_data.clear()
     await update.message.reply_text(
-        "🤖 *AIRDROP BOT* — Admin Paneli\n\n"
+        "🤖 <b>AIRDROP BOT</b> — Admin Paneli\n\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "🔍 *Airdrop Tara* → İnterneti tara, aktif airdropları listele\n"
-        "✍️ *Post Oluştur* → Airdrop adı veya link at, derin araştır\n"
-        "📢 *Gruba Gönder* → Hazır postu gruba gönder\n"
+        "🔍 <b>Airdrop Tara</b> → İnterneti tara, aktif airdropları listele\n"
+        "✍️ <b>Post Oluştur</b> → Airdrop adı veya link at, derin araştır\n"
+        "📢 <b>Gruba Gönder</b> → Hazır postu gruba gönder\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "💡 _Airdrop adı veya linki direkt yazabilirsin._",
+        "💡 <i>Airdrop adı veya linki direkt yazabilirsin.</i>",
         parse_mode=ParseMode.HTML,
         reply_markup=main_menu(),
     )
