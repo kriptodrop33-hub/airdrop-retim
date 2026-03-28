@@ -291,11 +291,17 @@ def admin_only(func):
     return wrapper
 
 def admin_only_callback(func):
-    """Decorator: callback butonlar için admin guard."""
+    """Decorator: callback butonlar için admin guard. Grup/kanal ve yabancıları sessizce yoksay."""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
+        user_id   = update.effective_user.id
+        chat_type = update.effective_chat.type
+        # Grup/kanal ise hiç cevap verme
+        if chat_type in ("group", "supergroup", "channel"):
+            await update.callback_query.answer()  # Telegram spinner'ını kapat, sessiz kal
+            return
+        # Admin değilse sessiz kal
         if user_id != ADMIN_CHAT_ID:
-            await update.callback_query.answer("⛔ Yetkisiz erişim.", show_alert=True)
+            await update.callback_query.answer()  # Spinner kapat, uyarı gösterme
             return
         return await func(update, context)
     wrapper.__name__ = func.__name__
@@ -1613,14 +1619,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start",     cmd_start))
-    app.add_handler(CommandHandler("help",      cmd_help))
-    app.add_handler(CommandHandler("scan",      cmd_scan))
-    app.add_handler(CommandHandler("post",      cmd_post))
-    app.add_handler(CommandHandler("sendgroup", cmd_sendgroup))
+    # Tüm handler'lar sadece PRIVATE (DM) mesajlarını işler — grup/kanal tamamen yoksayılır
+    private = filters.ChatType.PRIVATE
 
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CommandHandler("start",     cmd_start,     filters=private))
+    app.add_handler(CommandHandler("help",      cmd_help,      filters=private))
+    app.add_handler(CommandHandler("scan",      cmd_scan,      filters=private))
+    app.add_handler(CommandHandler("post",      cmd_post,      filters=private))
+    app.add_handler(CommandHandler("sendgroup", cmd_sendgroup, filters=private))
+
+    app.add_handler(CallbackQueryHandler(handle_callback))  # callback guard'ı decorator'da
+    app.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("🚀 Airdrop Bot başlatıldı.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
