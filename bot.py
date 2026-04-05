@@ -857,20 +857,33 @@ CE = {
 
 def apply_custom_emojis(text: str) -> str:
     """Metindeki standart emojileri Premium animasyonlu versiyonlarıyla değiştir."""
-    # ⛔ ÖNEMLİ: Eğer metin zaten <tg-emoji> etiketleri içeriyorsa, 
-    # içindeki emojileri tekrar etiketleyip (nesting) hataya sebep olmamak için regex kullanıyoruz.
     import re
+    # ⛔ GÜVENLİK: Eğer metin zaten <tg-emoji> içeriyorsa veya çok karmaşıksa hata almamak için 
+    # placeholder yöntemi kullanıyoruz.
     
+    # Değiştirilecek emojileri listele
     sorted_emojis = sorted(CE.keys(), key=len, reverse=True)
     
+    # 1. Mevcut HTML etiketlerini ve linkleri korumaya al (placeholder)
+    placeholders = []
+    def to_placeholder(match):
+        placeholders.append(match.group(0))
+        return f"__PH{len(placeholders)-1}__"
+    
+    # Etiketleri koru
+    text = re.sub(r'<[^>]+>', to_placeholder, text)
+    
+    # 2. Sadece düz metin kalan yerlerde emojileri değiştir
     for emoji in sorted_emojis:
         if emoji in text:
             eid = CE[emoji]
-            # Sadece halihazırda bir etiketin içinde OLMAYAN emojileri değiştir.
-            # Bu regex, etiketin içindeki (fallback) emojiyi tekrar yakalamaz.
-            pattern = f'(?<!>){re.escape(emoji)}(?!</tg-emoji>)'
-            replacement = f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>'
-            text = re.sub(pattern, replacement, text)
+            # Emoji tagını placeholder olmadan direkt yerleştir (çünkü içinde başka tag yok)
+            text = text.replace(emoji, f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>')
+    
+    # 3. Korumaya aldığımız etiketleri geri koy
+    for i, ph_val in enumerate(placeholders):
+        text = text.replace(f"__PH{i}__", ph_val)
+        
     return text
 
 def html_escape(text: str) -> str:
@@ -1182,11 +1195,14 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     if len(score_msg) > 3000:
         score_msg = score_msg[:2900] + "\n\n<i>...metin çok uzun olduğu için kırpıldı.</i>"
     try:
+        # En temiz haliyle göndermeyi dene
         await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
     except Exception as e:
-        logger.error(f"HTML Edit Hatasi: {e}")
-        # Hata olursa tagları temizleyip gönder ki en azından okunabilsin
-        clean_msg = score_msg.replace("<b>","").replace("</b>","").replace("<i>","").replace("</i>","")
+        logger.warning(f"HTML Edit Reddedildi ({e}), temizleniyor...")
+        # Hata (BadRequest vb.) olursa tüm kodları temizle ve öyle gönder
+        import re
+        clean_msg = re.sub(r'<[^>]+>', '', score_msg) # Tüm etiketleri süpür
+        clean_msg = clean_msg.replace("**", "")       # Kalınlıkları süpür
         await msg.edit_text(clean_msg[:4000])
 
     # 6. Post önizleme + aksiyon butonları
