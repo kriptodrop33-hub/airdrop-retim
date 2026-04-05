@@ -708,69 +708,69 @@ POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postlar
 2. Referral/promo kodu ASLA yazma
 3. Hashtag (#) yasak
 4. Şablon metnini ("yoksa sil" gibi) posta bırakma
-5. Link için sadece: [🔗 TIKLA 🖊]
+5. Link için sadece: [🔗 TIKLA 🔗]
 6. Türkçe | HTML: <b>kalın</b>
+7. <tg-emoji> tagı YAZMA — bunlar ayrıca eklenir
 
 KISALTMA KURALLARI:
-- Ödül yoksa → "Kampanya ödülü"
-- Son tarih yoksa → o satırı komple sil
+- Ödül yoksa → "Kampanya ödülü" yaz
+- Son tarih yoksa → Kampanya dönemi satırını komple sil
 - Adım yoksa → o adımı komple sil
+- Katılım + Etkinlik linki aynıysa tek satır yaz
 
-AYNEN bu yapıyı kullan:
+AYNEN bu yapıyı kullan (başka format kabul yok):
 
 🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
 
-[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
+[Tek cümle açıklama — kullanıcıyı heyecanlandır, somut bilgi ver] 😉
 
-—————————————————
-💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
-🤑 [ödül miktarı]
+——————————————————
 
-—————————————————
 🎯 <b>YAPMAN GEREKENLER:</b>
 
-🥇 [adım 1]
-🥈 [adım 2]
-🥉 [adım 3]
-🏅 [adım 4 — yoksa sil]
+①  [adım 1 — tam cümle]
+②  [adım 2 — tam cümle]
+③  [adım 3 — yoksa sil]
 
-🗓 Son gün [son tarih — yoksa bu satırı sil]
+——————————————————
+»  Hemen Kaydol:     🔗 [🔗 TIKLA 🔗] 🔗
+»  Etkinlik Sayfası: 🔗 [🔗 TIKLA 🔗] 🔗
 
-—————————————————
-➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+<b>Görev zorluğu:</b>  [Kolay / Orta / Zor]
+<b>Ödül miktarı: </b>  [rakam — ör: 880 TL / 50 USDT]
+<b>Airdrop puanı:</b> [⭐ sayısı 1-5 — güvenilirliğe göre]
 
-<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
-<b>Ödül miktarı:</b> [rakam]
-<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+🗓 <b>Kampanya Dönemi:</b> [başlangıç tarihi Saat XX.XX - bitiş tarihi Saat XX.XX — yoksa bu satırı sil]
 
-—————————————————
-🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
-📢 @kriptodropduyuru
-🎁 @kriptodroptr"""
+——————————————————
+🔥 Daha fazla airdrop için duyuru kanalını pinle
+📣 @kriptodropduyuru"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
+⛔ <tg-emoji> tagı yazma.
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🔗] | Maks 350 karakter | Türkçe
 
 YAPI:
-🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
+🚀 <b>[PLATFORM] — [BAŞLIK]!</b> 🎁
 
-🤑 <b>Ödül:</b> [rakam]
-🥇 [adım 1]
-🥈 [adım 2]
+①  [adım 1]
+②  [adım 2]
 
-➡️ [🔗 TIKLA 🖊]
-📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
+💰 <b>Ödül:</b> [rakam]
+»  [🔗 TIKLA 🔗]
+📣 @kriptodropduyuru"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
+⛔ <tg-emoji> tagı yazma.
+HTML: <b>kalın</b> | Link: [🔗 TIKLA 🔗] | Türkçe
 
 FORMAT:
-🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
-📢 @kriptodropduyuru 🎁 @kriptodroptr"""
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. » [🔗 TIKLA 🔗]
+📣 @kriptodropduyuru"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -782,19 +782,36 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"2. Referral kodu, promo kodu, davet kodu YAZMA — analizde varsa bile\n"
         f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
         f"4. Adımları analizden al, kendin adım uydurma\n"
-        f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma"
+        f"5. [🔗 TIKLA 🔗] placeholder'ını koru — URL yazma"
     )
+
+
+def _inject_premium_emojis(post: str) -> str:
+    """
+    AI'nin ürettiği postun içindeki standart emojileri Telegram premium
+    animasyonlu emojilerle değiştirir. Sadece başlık satırındaki 🚀 ve 🎁'yi
+    premium yapar; geri kalanı olduğu gibi bırakır (gruptaki üyeler görebilsin).
+    """
+    import re as _re
+    # Başlık satırı: 🚀 ... 🎁  →  premium versiyonları
+    post = post.replace("🚀 <b>", f"{CE['rocket']} <b>", 1)
+    # Sondaki 🎁 (başlıkta) — sadece ilk occurrence
+    post = post.replace("!</b> 🎁", f"!</b> {CE['gift']}", 1)
+    # Footer 🔥
+    post = post.replace("🔥 Daha fazla", f"{CE['fire']} Daha fazla", 1)
+    return post
 
 
 def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
     """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
+        raw = ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
+        raw = ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+        raw = ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+    return _inject_premium_emojis(raw)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -838,19 +855,25 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
+# ── Premium Custom Emoji ID'leri (Telegram built-in animasyonlu emojiler) ──────
 # HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+# Bu ID'ler Telegram'ın kendi ücretsiz premium emoji paketinden alınmıştır.
 CE = {
-    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
-    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
     "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
-    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
-    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
-    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
-    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
-    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
-    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
-    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
+    "gift":     "<tg-emoji emoji-id=\"5445284980978621387\">🎁</tg-emoji>",
+    "fire":     "<tg-emoji emoji-id=\"5422925111820764015\">🔥</tg-emoji>",
+    "money":    "<tg-emoji emoji-id=\"5431449001532594346\">💰</tg-emoji>",
+    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
+    "target":   "<tg-emoji emoji-id=\"5472354553403225061\">🎯</tg-emoji>",
+    "star":     "<tg-emoji emoji-id=\"5447644880824181073\">⭐</tg-emoji>",
+    "check":    "<tg-emoji emoji-id=\"5445420846451948439\">✅</tg-emoji>",
+    "crown":    "<tg-emoji emoji-id=\"5471952986970267163\">👑</tg-emoji>",
+    "chart":    "<tg-emoji emoji-id=\"5431815452437257407\">📈</tg-emoji>",
+    "bell":     "<tg-emoji emoji-id=\"5467337833513163773\">🔔</tg-emoji>",
+    "calendar": "<tg-emoji emoji-id=\"5451882365085904DEF\">🗓</tg-emoji>",
+    "arrow":    "<tg-emoji emoji-id=\"5469770487874568660\">➡️</tg-emoji>",
+    "link":     "<tg-emoji emoji-id=\"5467518259944882252\">🔗</tg-emoji>",
+    "speaker":  "<tg-emoji emoji-id=\"5467106459890077422\">📢</tg-emoji>",
 }
 
 def html_escape(text: str) -> str:
@@ -987,7 +1010,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for"] = None
         post = context.user_data.get("last_post", "")
         link = text.strip()
-        updated = post.replace("[🔗 TIKLA 🖊]", link)
+        updated = post.replace("[🔗 TIKLA 🔗]", link)
         context.user_data["final_post"] = updated
         context.user_data["has_link"] = True
 
@@ -1444,7 +1467,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not post:
             await q.answer("⚠️ Önce bir post oluştur.", show_alert=True)
             return
-        updated = post.replace("[🔗 TIKLA 🖊]", lnk["url"])
+        updated = post.replace("[🔗 TIKLA 🔗]", lnk["url"])
         context.user_data["final_post"] = updated
         context.user_data["has_link"]   = True
         record_post_use(lid)
