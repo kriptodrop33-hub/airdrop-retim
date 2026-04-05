@@ -873,26 +873,23 @@ def md_to_html(text: str) -> str:
     """AI'nin ürettiği Markdown veya HTML metni Telegram HTML'e çevir."""
     import re
     
-    # ⛔ HTML ESCAPE'İ KALDIRDIK — Çünkü AI zaten <b> etiketleri hazırlıyor.
-    # Eğer escape yaparsak <b> yerine &lt;b&gt; görünüyor.
+    # 1. Önce her şeyi güvenli hale getir (escape)
+    # Bu sayede metin içindeki & ve rastgele < > işaretleri hata vermez.
+    text = html_escape(text)
     
-    # Hashtag temizle
-    text = re.sub(r'(?m)^#+\s.*$', "", text)
-    text = re.sub(r'#\w+', "", text)
-    
-    # **bold** → <b>bold</b> (AI markdown kullanmışsa)
+    # 2. Markdown kalınlıkları (**) <b> etiketine çevir (escape sonrası güvenlidir)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-    # *bold* → <b>bold</b>
-    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
-    # _italic_ → <i>italic</i>
-    text = re.sub(r'_(.+?)_', r'<i>\1</i>', text)
-    # `code` → <code>code</code>
-    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
     
-    # Birden fazla boş satırı teke indir
+    # 3. AI tarafında üretilen ve escape edilmiş etiketleri geri aç
+    # &lt;b&gt; olanları tekrar <b> yapıyoruz ki Telegram anlasın
+    text = text.replace("&lt;b&gt;", "<b>").replace("&lt;/b&gt;", "</b>")
+    text = text.replace("&lt;i&gt;", "<i>").replace("&lt;/i&gt;", "</i>")
+    text = text.replace("&lt;code&gt;", "<code>").replace("&lt;/code&gt;", "</code>")
+    
+    # 4. Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
     
-    # PREMIUM EMOJI UYGULA
+    # 5. PREMIUM EMOJI UYGULA (Kendi etiketlerimizi ekliyoruz)
     text = apply_custom_emojis(text)
     
     return text.strip()
