@@ -702,74 +702,67 @@ KURALLAR:
 
 # ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
+Görsel olarak estetik, premium ve zengin bir dil kullanmalısın.
 
 ⛔ KESİN YASAKLAR:
 1. Analizde OLMAYAN rakam, kod, URL yazma
 2. Referral/promo kodu ASLA yazma
 3. Hashtag (#) yasak
-4. Şablon metnini ("yoksa sil" gibi) posta bırakma
-5. Link için sadece: [🔗 TIKLA 🖊]
-6. Türkçe | HTML: <b>kalın</b>
+4. Link için sadece: ⚡️ [🔗 TIKLA 🖊] ⚡️
 
-KISALTMA KURALLARI:
-- Ödül yoksa → "Kampanya ödülü"
-- Son tarih yoksa → o satırı komple sil
-- Adım yoksa → o adımı komple sil
+AYNEN BU GÖRSEL YAPIYI VE EMOJİLERİ KULLAN (Hizalamaya dikkat et):
 
-AYNEN bu yapıyı kullan:
+🚀 <b>[PLATFORM ADI] [BAŞLIK]!</b> 🎁
 
-🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
+[Kısa ve heyecan verici açıklama - örn: Yeni üyelere özel 1200 TL fırsatı! 🤑]
 
-[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
+-----------------------------------------
 
-—————————————————
-💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
-🤑 [ödül miktarı]
+📍 <b>YAPMAN GEREKENLER:</b>
 
-—————————————————
-🎯 <b>YAPMAN GEREKENLER:</b>
+🥇 [Adım 1 - örn: Kayıt ol ve KYC tamamla]
+🥈 [Adım 2 - örn: İlk yatırımını yap]
+🥉 [Adım 3 - örn: Ödülünü anında al!]
 
-🥇 [adım 1]
-🥈 [adım 2]
-🥉 [adım 3]
-🏅 [adım 4 — yoksa sil]
+-----------------------------------------
 
-🗓 Son gün [son tarih — yoksa bu satırı sil]
-
-—————————————————
-➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+🔹 <b>Hemen Kaydol:</b> ⚡️ [🔗 TIKLA 🖊] ⚡️
+🔹 <b>Etkinlik Sayfası:</b> ⚡️ [🔗 TIKLA 🖊] ⚡️
 
 <b>Görev zorluğu:</b> [Kolay/Orta/Zor]
-<b>Ödül miktarı:</b> [rakam]
-<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+<b>Ödül miktarı:</b> [Rakam]
+<b>Airdrop puanı:</b> [⭐ sayısı - 1-5 arası]
 
-—————————————————
+🗓 <b>Kampanya Dönemi:</b> [Tarih aralığı - yoksa sil]
+
+-----------------------------------------
+
 🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
-📢 @kriptodropduyuru
-🎁 @kriptodroptr"""
+📢 @kriptodropduyuru 
+🎁 @kriptodroptr
+
+-----------------------------------------
+"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
+✅ HTML: <b>kalın</b> | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Maks 350 karakter | Türkçe
 
-YAPI:
-🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
-
+🚀 <b>[PLATFORM] — [BAŞLIK]!</b> 🎁
 🤑 <b>Ödül:</b> [rakam]
 🥇 [adım 1]
 🥈 [adım 2]
-
-➡️ [🔗 TIKLA 🖊]
+⚡️ [🔗 TIKLA 🖊] ⚡️
 📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
+HTML: <b>kalın</b> | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Türkçe
 
-FORMAT:
-🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! 🚀
+➡️ ⚡️ [🔗 TIKLA 🖊] ⚡️
 📢 @kriptodropduyuru 🎁 @kriptodroptr"""
 
 
@@ -838,20 +831,36 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
-# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+# ── Premium Custom Emoji Map (Telegram Premium) ──────────────────────────────
+# HTML mode: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+# Bu ID'ler standart Telegram Premium ve Crypto setlerinden alınmıştır.
 CE = {
-    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
-    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
-    "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
-    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
-    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
-    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
-    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
-    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
-    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
-    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
+    "🚀": "5368324170671202286",  # Roket
+    "🔥": "5368324170671202286",  # Ateş
+    "🎁": "5386367538735104399",  # Hediye
+    "⭐": "5368324170671202286",  # Yıldız
+    "💰": "5368324170671202286",  # Para
+    "⚡": "5386367538735104399",  # Şimşek/Uyarı
+    "✅": "5368324170671202286",  # Onay
+    "📢": "5386367538735104399",  # Duyuru
+    "💎": "5386367538735104399",  # Elmas
+    "🥇": "5386367538735104399",  # 1. (Altın)
+    "🥈": "5386367538735104399",  # 2.
+    "🥉": "5386367538735104399",  # 3.
+    "📍": "5368324170671202286",  # Konum/Nokta
+    "🔹": "5386367538735104399",  # Mavi ok/nokta
+    "1️⃣": "5386367538735104399", # Rakam 1
+    "2️⃣": "5386367538735104399", # Rakam 2
+    "3️⃣": "5386367538735104399", # Rakam 3
 }
+
+def apply_custom_emojis(text: str) -> str:
+    """Metindeki standart emojileri Premium animasyonlu versiyonlarıyla değiştir."""
+    for emoji, eid in CE.items():
+        if emoji in text:
+            # Kaçış karakterlerini (escape) bozmamak için dikkatli değiştir
+            text = text.replace(emoji, f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>')
+    return text
 
 def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
@@ -860,10 +869,13 @@ def html_escape(text: str) -> str:
 def md_to_html(text: str) -> str:
     """AI'nin ürettiği Markdown benzeri metni Telegram HTML'e çevir."""
     import re
+    # Başta HTML escape yap (kendi etiketlerimizi eklemeden önce)
+    text = html_escape(text)
+    
     # Hashtag temizle
     text = re.sub(r'(?m)^#+\s.*$', "", text)
     text = re.sub(r'#\w+', "", text)
-    # **bold** → <b>bold</b>
+    # **bold** → <b>bold</b> (escape sonrası olduğu için özel karakter içermez)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     # *bold* → <b>bold</b>
     text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
@@ -873,6 +885,10 @@ def md_to_html(text: str) -> str:
     text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
     # Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
+    
+    # PREMIUM EMOJI UYGULA
+    text = apply_custom_emojis(text)
+    
     return text.strip()
 
 def safe_md(text: str) -> str:
