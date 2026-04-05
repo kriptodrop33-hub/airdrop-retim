@@ -722,13 +722,13 @@ Görsel olarak estetik, premium ve zengin bir dil kullanmalısın.
 
 AYNEN BU GÖRSEL YAPIYI VE EMOJİLERİ KULLAN (Hizalamaya dikkat et):
 
-🚀 <b>[PLATFORM ADI] [BAŞLIK]!</b> 🎁
+🚀 **[PLATFORM ADI] [BAŞLIK]!** 🎁
 
 [Kısa ve heyecan verici açıklama - örn: Yeni üyelere özel 1200 TL fırsatı! 🤑]
 
 -----------------------------------------
 
-📍 <b>YAPMAN GEREKENLER:</b>
+📍 **YAPMAN GEREKENLER:**
 
 🥇 [Adım 1 - örn: Kayıt ol ve KYC tamamla]
 🥈 [Adım 2 - örn: İlk yatırımını yap]
@@ -736,23 +736,23 @@ AYNEN BU GÖRSEL YAPIYI VE EMOJİLERİ KULLAN (Hizalamaya dikkat et):
 
 -----------------------------------------
 
-🔹 <b>Hemen Kaydol:</b> ⚡️ [🔗 TIKLA 🖊] ⚡️
-🔹 <b>Etkinlik Sayfası:</b> ⚡️ [🔗 TIKLA 🖊] ⚡️
+🔹 **Hemen Kaydol:** ⚡️ [🔗 TIKLA 🖊] ⚡️
+🔹 **Etkinlik Sayfası:** ⚡️ [🔗 TIKLA 🖊] ⚡️
 
-<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
-<b>Ödül miktarı:</b> [Rakam]
-<b>Airdrop puanı:</b> [⭐ sayısı - 1-5 arası]
+**Görev zorluğu:** [Kolay/Orta/Zor]
+**Ödül miktarı:** [Rakam]
+**Airdrop puanı:** [⭐ sayısı - 1-5 arası]
 
-🗓 <b>Kampanya Dönemi:</b> [Tarih aralığı - yoksa sil]
+🗓 **Kampanya Dönemi:** [Tarih aralığı - yoksa sil]
 """
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ HTML: <b>kalın</b> | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Maks 350 karakter | Türkçe
+✅ Kalınlık için: **metin** | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Maks 350 karakter | Türkçe
 
-🚀 <b>[PLATFORM] — [BAŞLIK]!</b> 🎁
-🤑 <b>Ödül:</b> [rakam]
+🚀 **[PLATFORM] — [BAŞLIK]!** 🎁
+🤑 **Ödül:** [rakam]
 🥇 [adım 1]
 🥈 [adım 2]
 ⚡️ [🔗 TIKLA 🖊] ⚡️"""
@@ -760,9 +760,9 @@ POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-HTML: <b>kalın</b> | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Türkçe
+✅ Kalınlık için: **metin** | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Türkçe
 
-🚀 <b>[PLATFORM]</b> — [ödül] kazan! 🚀
+🚀 **[PLATFORM]** — [ödül] kazan! 🚀
 ➡️ ⚡️ [🔗 TIKLA 🖊] ⚡️"""
 
 
@@ -878,26 +878,21 @@ def html_escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def md_to_html(text: str) -> str:
-    """AI'nin ürettiği Markdown veya HTML metni Telegram HTML'e çevir."""
+    """AI'nin ürettiği Markdown metni Telegram HTML'ine güvenli şekilde çevirir."""
     import re
     
     # 1. Önce her şeyi güvenli hale getir (escape)
     # Bu sayede metin içindeki & ve rastgele < > işaretleri hata vermez.
     text = html_escape(text)
     
-    # 2. Markdown kalınlıkları (**) <b> etiketine çevir (escape sonrası güvenlidir)
+    # 2. Sadece TAM EŞLEŞEN kalınlıkları (**) <b> etiketine çevir.
+    # Bu yöntem, kapanış etiketi olmayan bozuk yapıları görmezden gelir (hata vermez).
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     
-    # 3. AI tarafında üretilen ve escape edilmiş etiketleri geri aç
-    # &lt;b&gt; olanları tekrar <b> yapıyoruz ki Telegram anlasın
-    text = text.replace("&lt;b&gt;", "<b>").replace("&lt;/b&gt;", "</b>")
-    text = text.replace("&lt;i&gt;", "<i>").replace("&lt;/i&gt;", "</i>")
-    text = text.replace("&lt;code&gt;", "<code>").replace("&lt;/code&gt;", "</code>")
-    
-    # 4. Birden fazla boş satırı teke indir
+    # 3. Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
     
-    # 5. PREMIUM EMOJI UYGULA (Kendi etiketlerimizi ekliyoruz)
+    # 4. PREMIUM EMOJI UYGULA
     text = apply_custom_emojis(text)
     
     return text.strip()
@@ -1175,13 +1170,13 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # 5. Güvenilirlik raporunu göster
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
     score_msg = (
-        f"📊 <b>GÜVENİLİRLİK RAPORU — {project_name.upper()}</b>\n"
+        f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: <b>{badge}</b>\n\n"
-        f"📋 <b>Değerlendirme:</b>\n{reasons_text}\n"
+        f"Skor: **{badge}**\n\n"
+        f"📋 **Değerlendirme:**\n{reasons_text}\n"
     )
     if warning:
-        score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
+        score_msg += f"\n⚠️ **Uyarı:** {warning}\n"
     score_msg += f"\n{safe_md(analysis)}"
 
     if len(score_msg) > 3000:
