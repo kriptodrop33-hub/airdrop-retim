@@ -875,23 +875,20 @@ def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-def md_to_html(text: str) -> str:
-    """AI'nin ürettiği Markdown metni Telegram HTML'ine güvenli şekilde çevirir."""
+def md_to_html(text: str, is_premium: bool = False) -> str:
+    """Metni en güvenli şekilde Telegram HTML formatına çevirir."""
     import re
+    if not text: return ""
     
-    # 1. Önce her şeyi güvenli hale getir (escape)
-    # Bu sayede metin içindeki & ve rastgele < > işaretleri hata vermez.
+    # 1. Metni temizle
     text = html_escape(text)
     
-    # 2. Sadece TAM EŞLEŞEN kalınlıkları (**) <b> etiketine çevir.
-    # Bu yöntem, kapanış etiketi olmayan bozuk yapıları görmezden gelir (hata vermez).
+    # 2. Kalınlıkları çevir (**word** -> <b>word</b>)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     
-    # 3. Birden fazla boş satırı teke indir
-    text = re.sub(r'\n{3,}', "\n\n", text)
-    
-    # 4. PREMIUM EMOJI UYGULA
-    text = apply_custom_emojis(text)
+    # 3. Premium emojileri ekle (Sadece is_premium=True ise)
+    if is_premium:
+        text = apply_custom_emojis(text)
     
     return text.strip()
 
@@ -1041,18 +1038,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode=ParseMode.HTML,
                     reply_markup=post_actions(has_link=True),
                 )
-        else:
-            preview = (
-                f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
-                f"Hazır! Gruba gönderebilirsin."
-            )
-            if len(preview) > 4096:
-                preview = preview[:4086] + "_"
-            await update.message.reply_text(
-                preview,
-                parse_mode=ParseMode.HTML,
-                reply_markup=post_actions(has_link=True),
-            )
         return
 
     # Post düzenleme
@@ -1156,8 +1141,9 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # 4. Post oluştur
     await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
     post = build_post(analysis, project_name)
-    context.user_data["last_post"]          = post
-    context.user_data["final_post"]         = post
+    final_post_html = md_to_html(post, is_premium=True)
+    context.user_data["last_post"]          = final_post_html
+    context.user_data["final_post"]         = final_post_html
     context.user_data["last_post_platform"] = project_name
     context.user_data["has_link"]           = False
     context.user_data["post_fmt"]           = "long"
@@ -1177,8 +1163,19 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     )
 
     # ⛔ GÜVENLİK: Markdown'dan HTML'e çevirirken hata riskini sıfırlıyoruz
+    # 5. Raporu hazırla (Daha güvenli hale getirildi)
+    score_msg = (
+        f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Skor: {badge}\n\n"
+        f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
+        f"{analysis}\n\n"
+        f"🤖 **[v2.5 - TAMİR EDİLDİ]**"
+    )
+    
+    # Önce Markdown olarak temizle sonra HTML yap
     if len(score_msg) > 3000:
-        score_msg = score_msg[:2900] + "\n\n**...kırpıldı.**"
+        score_msg = score_msg[:2900] + "..."
     
     score_html = md_to_html(score_msg, is_premium=False)
     
