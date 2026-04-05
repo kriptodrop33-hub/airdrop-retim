@@ -857,12 +857,20 @@ CE = {
 
 def apply_custom_emojis(text: str) -> str:
     """Metindeki standart emojileri Premium animasyonlu versiyonlarıyla değiştir."""
-    # En uzun emojiden kısalara doğru (örn: ⚡️ vs ⚡)
+    # ⛔ ÖNEMLİ: Eğer metin zaten <tg-emoji> etiketleri içeriyorsa, 
+    # içindeki emojileri tekrar etiketleyip (nesting) hataya sebep olmamak için regex kullanıyoruz.
+    import re
+    
     sorted_emojis = sorted(CE.keys(), key=len, reverse=True)
+    
     for emoji in sorted_emojis:
         if emoji in text:
             eid = CE[emoji]
-            text = text.replace(emoji, f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>')
+            # Sadece halihazırda bir etiketin içinde OLMAYAN emojileri değiştir.
+            # Bu regex, etiketin içindeki (fallback) emojiyi tekrar yakalamaz.
+            pattern = f'(?<!>){re.escape(emoji)}(?!</tg-emoji>)'
+            replacement = f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>'
+            text = re.sub(pattern, replacement, text)
     return text
 
 def html_escape(text: str) -> str:
@@ -1178,7 +1186,12 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
 
     if len(score_msg) > 4000:
         score_msg = score_msg[:3990] + "\n<i>...kırpıldı</i>"
-    await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
+    try:
+        await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        logger.error(f"HTML Edit Hatasi: {e}\nIcerik: {score_msg}")
+        # Hata olursa düz metin olarak gönder ki bot takılmasın
+        await msg.edit_text(score_msg)
 
     # 6. Post önizleme + aksiyon butonları
     post_preview = (
