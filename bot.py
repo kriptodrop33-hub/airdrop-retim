@@ -1173,16 +1173,14 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         f"Skor: {badge}\n\n"
         f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
         f"{analysis}\n\n"
-        f"🤖 *[v2.3 - Kararlı Sürüm]*"
+        f"🤖 **[v2.4 - Kesin Sürüm]**"
     )
 
-    # ⛔ KRİTİK DÜZELTME: Önce Markdown metni kesiyoruz (Safe Slicing)
-    # Bu, HTML etiketlerinin (<b> gibi) ortadan bölünmesini engeller.
+    # ⛔ GÜVENLİK: Markdown'dan HTML'e çevirirken hata riskini sıfırlıyoruz
     if len(score_msg) > 3000:
-        score_msg = score_msg[:2950] + "\n\n**...metin çok uzun olduğu için kırpıldı.**"
+        score_msg = score_msg[:2900] + "\n\n**...kırpıldı.**"
     
-    # Kesildikten sonra HTML'e çeviriyoruz (Tüm etiketler artık tam ve sağlıklı)
-    score_html = md_to_html(score_msg)
+    score_html = md_to_html(score_msg, is_premium=False)
     
     try:
         await msg.edit_text(score_html, parse_mode=ParseMode.HTML)
@@ -1193,22 +1191,24 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         clean_msg = re.sub(r'<[^>]+>', '', score_html).replace("**", "")
         await msg.edit_text(clean_msg[:4000])
 
-    # 6. Post önizleme + aksiyon butonları
+    # 6. Post önizleme (Görsel stile sadık kalınarak)
     post_preview = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📣 <b>HAZIRLANAN POST:</b>\n\n"
-        f"{safe_md(post)}\n\n"
+        f"🚀 **HAZIRLANAN POST:**\n\n"
+        f"{final_post_html}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"Skor: {badge}"
     )
-    if len(post_preview) > 4096:
-        post_preview = post_preview[:4086] + "..."
-
-    await update.effective_message.reply_text(
-        post_preview,
-        parse_mode=ParseMode.HTML,
-        reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
-    )
+    
+    try:
+        await update.effective_message.reply_text(
+            post_preview,
+            parse_mode=ParseMode.HTML,
+            reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
+        )
+    except Exception as e:
+        logger.error(f"Onizleme Hatasi: {e}")
+        await update.effective_message.reply_text("⚠️ Post önizlemesi hazırlandı (Filtresiz).")
 
 # ══════════════════════════════════════════════════════════
 #  GRUBA GÖNDERME
