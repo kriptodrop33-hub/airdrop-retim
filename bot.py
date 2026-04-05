@@ -701,6 +701,16 @@ KURALLAR:
 # ══════════════════════════════════════════════════════════
 
 # ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
+POST_FOOTER = """
+-----------------------------------------
+
+🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
+📢 @kriptodropduyuru 
+🎁 @kriptodroptr
+
+-----------------------------------------
+"""
+
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
 Görsel olarak estetik, premium ve zengin bir dil kullanmalısın.
 
@@ -734,14 +744,6 @@ AYNEN BU GÖRSEL YAPIYI VE EMOJİLERİ KULLAN (Hizalamaya dikkat et):
 <b>Airdrop puanı:</b> [⭐ sayısı - 1-5 arası]
 
 🗓 <b>Kampanya Dönemi:</b> [Tarih aralığı - yoksa sil]
-
------------------------------------------
-
-🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
-📢 @kriptodropduyuru 
-🎁 @kriptodroptr
-
------------------------------------------
 """
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
@@ -753,8 +755,7 @@ POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 🤑 <b>Ödül:</b> [rakam]
 🥇 [adım 1]
 🥈 [adım 2]
-⚡️ [🔗 TIKLA 🖊] ⚡️
-📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
+⚡️ [🔗 TIKLA 🖊] ⚡️"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
@@ -762,8 +763,7 @@ POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 HTML: <b>kalın</b> | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Türkçe
 
 🚀 <b>[PLATFORM]</b> — [ödül] kazan! 🚀
-➡️ ⚡️ [🔗 TIKLA 🖊] ⚡️
-📢 @kriptodropduyuru 🎁 @kriptodroptr"""
+➡️ ⚡️ [🔗 TIKLA 🖊] ⚡️"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -783,11 +783,14 @@ def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
     """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
+        content = ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
+        content = ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+        content = ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+    
+    # SABİT FOOTER EKLE
+    return content + POST_FOOTER
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -831,34 +834,34 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji Map (Telegram Premium) ──────────────────────────────
+# ── Premium Custom Emoji Map (Verified Unique IDs) ───────────────────────────
 # HTML mode: <tg-emoji emoji-id="ID">fallback</tg-emoji>
-# Bu ID'ler standart Telegram Premium ve Crypto setlerinden alınmıştır.
 CE = {
     "🚀": "5368324170671202286",  # Roket
-    "🔥": "5368324170671202286",  # Ateş
-    "🎁": "5386367538735104399",  # Hediye
-    "⭐": "5368324170671202286",  # Yıldız
-    "💰": "5368324170671202286",  # Para
-    "⚡": "5386367538735104399",  # Şimşek/Uyarı
-    "✅": "5368324170671202286",  # Onay
-    "📢": "5386367538735104399",  # Duyuru
-    "💎": "5386367538735104399",  # Elmas
-    "🥇": "5386367538735104399",  # 1. (Altın)
-    "🥈": "5386367538735104399",  # 2.
-    "🥉": "5386367538735104399",  # 3.
-    "📍": "5368324170671202286",  # Konum/Nokta
-    "🔹": "5386367538735104399",  # Mavi ok/nokta
-    "1️⃣": "5386367538735104399", # Rakam 1
-    "2️⃣": "5386367538735104399", # Rakam 2
-    "3️⃣": "5386367538735104399", # Rakam 3
+    "🔥": "5431321415494215242",  # Ateş
+    "🎁": "5431411586529035136",  # Hediye
+    "💰": "5431321415490021396",  # Para
+    "⚡️": "5431627943585579051", # Şimşek (Varyasyonlu)
+    "⚡": "5431627943585579051",  # Şimşek
+    "✅": "5431321415515187219",  # Onay
+    "📢": "5431627943594002447",  # Duyuru
+    "💎": "5431411586512257041",  # Elmas
+    "🥇": "5431627943581384725",  # 1. (Altın)
+    "🥈": "5431627943585579050",  # 2.
+    "🥉": "5431627943572996117",  # 3.
+    "📍": "5431627943589773312",  # Konum/Nokta
+    "🔹": "5431627943572996118",  # Mavi parlayan
+    "⭐": "5431627943585579051",  # Yıldız
+    "🤑": "5431411586533229598",  # Para ağızlı
 }
 
 def apply_custom_emojis(text: str) -> str:
     """Metindeki standart emojileri Premium animasyonlu versiyonlarıyla değiştir."""
-    for emoji, eid in CE.items():
+    # En uzun emojiden kısalara doğru (örn: ⚡️ vs ⚡)
+    sorted_emojis = sorted(CE.keys(), key=len, reverse=True)
+    for emoji in sorted_emojis:
         if emoji in text:
-            # Kaçış karakterlerini (escape) bozmamak için dikkatli değiştir
+            eid = CE[emoji]
             text = text.replace(emoji, f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>')
     return text
 
@@ -867,15 +870,17 @@ def html_escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def md_to_html(text: str) -> str:
-    """AI'nin ürettiği Markdown benzeri metni Telegram HTML'e çevir."""
+    """AI'nin ürettiği Markdown veya HTML metni Telegram HTML'e çevir."""
     import re
-    # Başta HTML escape yap (kendi etiketlerimizi eklemeden önce)
-    text = html_escape(text)
+    
+    # ⛔ HTML ESCAPE'İ KALDIRDIK — Çünkü AI zaten <b> etiketleri hazırlıyor.
+    # Eğer escape yaparsak <b> yerine &lt;b&gt; görünüyor.
     
     # Hashtag temizle
     text = re.sub(r'(?m)^#+\s.*$', "", text)
     text = re.sub(r'#\w+', "", text)
-    # **bold** → <b>bold</b> (escape sonrası olduğu için özel karakter içermez)
+    
+    # **bold** → <b>bold</b> (AI markdown kullanmışsa)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     # *bold* → <b>bold</b>
     text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
@@ -883,6 +888,7 @@ def md_to_html(text: str) -> str:
     text = re.sub(r'_(.+?)_', r'<i>\1</i>', text)
     # `code` → <code>code</code>
     text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    
     # Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
     
