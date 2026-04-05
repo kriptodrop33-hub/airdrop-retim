@@ -703,47 +703,50 @@ KURALLAR:
 # ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
 POST_FOOTER = """
 -----------------------------------------
-
 🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
 📢 @kriptodropduyuru 
 🎁 @kriptodroptr
-
 -----------------------------------------
 """
 
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
-Görsel olarak estetik, premium ve zengin bir dil kullanmalısın.
+Görsel olarak estetik, premium ve profesyonel bir dil kullanmalısın.
 
 ⛔ KESİN YASAKLAR:
 1. Analizde OLMAYAN rakam, kod, URL yazma
 2. Referral/promo kodu ASLA yazma
 3. Hashtag (#) yasak
-4. Link için sadece: ⚡️ [🔗 TIKLA 🖊] ⚡️
+4. Link için sadece: [🔗 TIKLA 🖊]
 
-AYNEN BU GÖRSEL YAPIYI VE EMOJİLERİ KULLAN (Hizalamaya dikkat et):
+TASARIM KURALLARI (GÖRSELDEKİ STİLE UY):
+- Başlık: 🚀 **[PLATFORM ADI] [BAŞLIK]!** 🎁
+- Adımlar: (1), (2), (3) şeklinde numaralandır.
+- Linkler: » **[Link Adı]:** ⚡️ [🔗 TIKLA 🖊] ⚡️ (Mavi » karakterini kullan)
+- Skor: Airdrop puanı: ⭐⭐⭐⭐⭐ (Skora göre 1-5 arası yıldız)
 
-🚀 **[PLATFORM ADI] [BAŞLIK]!** 🎁
+ÖRNEK YAPI:
+🚀 **Binance TR yeni üye Bonusu!** 🎁
 
-[Kısa ve heyecan verici açıklama - örn: Yeni üyelere özel 1200 TL fırsatı! 🤑]
-
------------------------------------------
-
-📍 **YAPMAN GEREKENLER:**
-
-🥇 [Adım 1 - örn: Kayıt ol ve KYC tamamla]
-🥈 [Adım 2 - örn: İlk yatırımını yap]
-🥉 [Adım 3 - örn: Ödülünü anında al!]
+Yeni kullanıcılar için 880 TL bonus kazanma fırsatı 🤑
 
 -----------------------------------------
 
-🔹 **Hemen Kaydol:** ⚡️ [🔗 TIKLA 🖊] ⚡️
-🔹 **Etkinlik Sayfası:** ⚡️ [🔗 TIKLA 🖊] ⚡️
+🔥 **YAPMAN GEREKENLER:**
 
-**Görev zorluğu:** [Kolay/Orta/Zor]
-**Ödül miktarı:** [Rakam]
-**Airdrop puanı:** [⭐ sayısı - 1-5 arası]
+(1) Promosyona katılım için kayıt olun
+(2) Kayıt olduktan sonra etkinlik sayfasına git otomatik kaydolur
+(3) İlk para yatırma işlemini tamamla
 
-🗓 **Kampanya Dönemi:** [Tarih aralığı - yoksa sil]
+-----------------------------------------
+
+» **Hemen Kaydol:** ⚡️ [🔗 TIKLA 🖊] ⚡️
+» **Etkinlik Sayfası:** ⚡️ [🔗 TIKLA 🖊] ⚡️
+
+Görev zorluğu: [Kolay/Orta/Zor]
+Ödül miktarı: [Rakam]
+Airdrop puanı: [Yıldızlar]
+
+🗓 **Kampanya Dönemi:** [Tarih]
 """
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
@@ -1180,30 +1183,32 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Postu arşive kaydet
     save_post_archive(project_name, post, "long")
 
-    # 5. Güvenilirlik raporunu göster
+    # 5. Güvenilirlik raporunu göster (Karmaşayı önlemek için HTML tagları sadeleşti)
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
     score_msg = (
         f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: **{badge}**\n\n"
+        f"Skor: {badge}\n\n"
         f"📋 **Değerlendirme:**\n{reasons_text}\n"
     )
     if warning:
         score_msg += f"\n⚠️ **Uyarı:** {warning}\n"
-    score_msg += f"\n{safe_md(analysis)}"
+    
+    # Rapor kısmında premium emoji kullanmıyoruz (Sınır aşımı ve karmaşayı önlemek için)
+    # Sadece safe_md (Markdown -> HTML) dönüşümü yapıyoruz
+    analysis_html = html_escape(analysis)
+    analysis_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', analysis_html)
+    score_msg += f"\n{analysis_html}"
 
-    if len(score_msg) > 3000:
-        score_msg = score_msg[:2900] + "\n\n<i>...metin çok uzun olduğu için kırpıldı.</i>"
+    if len(score_msg) > 3500:
+        score_msg = score_msg[:3400] + "\n\n<i>...metin çok uzun olduğu için kırpıldı.</i>"
+    
     try:
-        # En temiz haliyle göndermeyi dene
         await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
     except Exception as e:
-        logger.warning(f"HTML Edit Reddedildi ({e}), temizleniyor...")
-        # Hata (BadRequest vb.) olursa tüm kodları temizle ve öyle gönder
-        import re
-        clean_msg = re.sub(r'<[^>]+>', '', score_msg) # Tüm etiketleri süpür
-        clean_msg = clean_msg.replace("**", "")       # Kalınlıkları süpür
-        await msg.edit_text(clean_msg[:4000])
+        logger.warning(f"Rapor HTML Hatasi: {e}")
+        # En sade halini gönder
+        await msg.edit_text(score_msg.replace("**","")[:4000])
 
     # 6. Post önizleme + aksiyon butonları
     post_preview = (
