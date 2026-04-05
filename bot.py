@@ -700,7 +700,7 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
+# ── POST TASARIMI ────────────────────────────────────────────────────────────
 POST_FOOTER = """
 -----------------------------------------
 🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
@@ -710,42 +710,22 @@ POST_FOOTER = """
 """
 
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
-Görsel olarak estetik, premium ve profesyonel bir dil kullanmalısın.
-
-⛔ KESİN YASAKLAR:
-1. Analizde OLMAYAN rakam, kod, URL yazma
-2. Referral/promo kodu ASLA yazma
-3. Hashtag (#) yasak
-4. Link için sadece: [🔗 TIKLA 🖊]
-
-TASARIM KURALLARI (GÖRSELDEKİ STİLE UY):
-- Başlık: 🚀 **[PLATFORM ADI] [BAŞLIK]!** 🎁
-- Adımlar: (1), (2), (3) şeklinde numaralandır.
-- Linkler: » **[Link Adı]:** ⚡️ [🔗 TIKLA 🖊] ⚡️ (Mavi » karakterini kullan)
-- Skor: Airdrop puanı: ⭐⭐⭐⭐⭐ (Skora göre 1-5 arası yıldız)
-
-ÖRNEK YAPI:
-🚀 **Binance TR yeni üye Bonusu!** 🎁
-
-Yeni kullanıcılar için 880 TL bonus kazanma fırsatı 🤑
-
+TASARIM KURALLARI (BU STİLE %100 UY):
+(1) Başlık formatı: 🚀 **[Platform] [Başlık]!** 🎁
+(2) Adımları mutlaka (1), (2), (3) şeklinde numaralandır.
+(3) Linkleri mutlaka » **[İsim]:** ⚡️ [🔗 TIKLA 🖊] ⚡️ şeklinde yaz. (Mavi » karakterini kullan)
+(4) Airdrop puanı: ⭐⭐⭐⭐⭐ (Skora göre 1-5 arası yıldız)
+(5) Örnek:
+🚀 **Binance TR Yeni Üye!** 🎁
+Summary text 🤑
 -----------------------------------------
-
 🔥 **YAPMAN GEREKENLER:**
-
-(1) Promosyona katılım için kayıt olun
-(2) Kayıt olduktan sonra etkinlik sayfasına git otomatik kaydolur
-(3) İlk para yatırma işlemini tamamla
-
+(1) Kayıt ol
+(2) KYC tamamla
 -----------------------------------------
-
 » **Hemen Kaydol:** ⚡️ [🔗 TIKLA 🖊] ⚡️
-» **Etkinlik Sayfası:** ⚡️ [🔗 TIKLA 🖊] ⚡️
-
-Görev zorluğu: [Kolay/Orta/Zor]
-Ödül miktarı: [Rakam]
-Airdrop puanı: [Yıldızlar]
-
+Görev zorluğu: Kolay
+Airdrop puanı: ⭐⭐⭐⭐⭐
 🗓 **Kampanya Dönemi:** [Tarih]
 """
 
@@ -1183,32 +1163,30 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Postu arşive kaydet
     save_post_archive(project_name, post, "long")
 
-    # 5. Güvenilirlik raporunu göster (Karmaşayı önlemek için HTML tagları sadeleşti)
+    # 5. Güvenilirlik raporunu göster
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
     score_msg = (
         f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"Skor: {badge}\n\n"
-        f"📋 **Değerlendirme:**\n{reasons_text}\n"
+        f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
+        f"{analysis}\n\n"
+        f"🤖 *[v2.2 - Kararlı Sürüm]*"
     )
-    if warning:
-        score_msg += f"\n⚠️ **Uyarı:** {warning}\n"
-    
-    # Rapor kısmında premium emoji kullanmıyoruz (Sınır aşımı ve karmaşayı önlemek için)
-    # Sadece safe_md (Markdown -> HTML) dönüşümü yapıyoruz
-    analysis_html = html_escape(analysis)
-    analysis_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', analysis_html)
-    score_msg += f"\n{analysis_html}"
 
-    if len(score_msg) > 3500:
-        score_msg = score_msg[:3400] + "\n\n<i>...metin çok uzun olduğu için kırpıldı.</i>"
+    # Raporu HTML formatına çevir (Hatasız olması için manuel işliyoruz)
+    score_html = md_to_html(score_msg)
+    if len(score_html) > 3800:
+        score_html = score_html[:3700] + "\n\n<i>...kırpıldı.</i>"
     
     try:
-        await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
+        await msg.edit_text(score_html, parse_mode=ParseMode.HTML)
     except Exception as e:
-        logger.warning(f"Rapor HTML Hatasi: {e}")
-        # En sade halini gönder
-        await msg.edit_text(score_msg.replace("**","")[:4000])
+        logger.error(f"Rapor HTML Hatasi: {e}")
+        # Hata olursa tagları silip düz gönder
+        import re
+        clean_msg = re.sub(r'<[^>]+>', '', score_html).replace("**", "")
+        await msg.edit_text(clean_msg[:4000])
 
     # 6. Post önizleme + aksiyon butonları
     post_preview = (
