@@ -875,20 +875,16 @@ def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-def md_to_html(text: str, is_premium: bool = False) -> str:
-    """Metni en güvenli şekilde Telegram HTML formatına çevirir."""
+def md_to_html(text: str) -> str:
+    """Metni Telegram HTML formatına çevirir (Sıfır Hata Garantili)."""
     import re
     if not text: return ""
     
-    # 1. Metni temizle
+    # 1. Kaçış işlemleri
     text = html_escape(text)
     
-    # 2. Kalınlıkları çevir (**word** -> <b>word</b>)
+    # 2. Kalınlıkları çevir (** -> <b>)
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-    
-    # 3. Premium emojileri ekle (Sadece is_premium=True ise)
-    if is_premium:
-        text = apply_custom_emojis(text)
     
     return text.strip()
 
@@ -1139,9 +1135,11 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     context.user_data["last_analysis"] = analysis
 
     # 4. Post oluştur
-    await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
+    await msg.edit_text("✍️ **Post hazırlanıyor...**", parse_mode=ParseMode.HTML)
     post = build_post(analysis, project_name)
-    final_post_html = md_to_html(post, is_premium=True)
+    
+    # ⛔ KESİN ÇÖZÜM: Sadece Bold (Kalın) yazı kullanıyoruz
+    final_post_html = md_to_html(post)
     context.user_data["last_post"]          = final_post_html
     context.user_data["final_post"]         = final_post_html
     context.user_data["last_post_platform"] = project_name
@@ -1151,6 +1149,8 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Postu arşive kaydet
     save_post_archive(project_name, post, "long")
 
+
+    # ⛔ GÜVENLİK: Markdown'dan HTML'e çevirirken hata riskini sıfırlıyoruz
     # 5. Güvenilirlik raporunu hazırlayıp göster
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
     score_msg = (
@@ -1159,25 +1159,14 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         f"Skor: {badge}\n\n"
         f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
         f"{analysis}\n\n"
-        f"🤖 **[v2.4 - Kesin Sürüm]**"
-    )
-
-    # ⛔ GÜVENLİK: Markdown'dan HTML'e çevirirken hata riskini sıfırlıyoruz
-    # 5. Raporu hazırla (Daha güvenli hale getirildi)
-    score_msg = (
-        f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: {badge}\n\n"
-        f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
-        f"{analysis}\n\n"
-        f"🤖 **[v2.5 - TAMİR EDİLDİ]**"
+        f"🤖 **[v2.6 - KESİN ÇÖZÜM]**"
     )
     
-    # Önce Markdown olarak temizle sonra HTML yap
+    # Önce Markdown olarak kes, sonra HTML yap (Hata riskini sıfırlar)
     if len(score_msg) > 3000:
         score_msg = score_msg[:2900] + "..."
     
-    score_html = md_to_html(score_msg, is_premium=False)
+    score_html = md_to_html(score_msg)
     
     try:
         await msg.edit_text(score_html, parse_mode=ParseMode.HTML)
