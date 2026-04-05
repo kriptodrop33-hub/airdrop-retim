@@ -538,7 +538,7 @@ FORMAT:
 
 Türkçe yaz. Uydurma YAPMA."""
 
-    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=800)
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
@@ -1184,14 +1184,15 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
     score_msg += f"\n{safe_md(analysis)}"
 
-    if len(score_msg) > 4000:
-        score_msg = score_msg[:3990] + "\n<i>...kırpıldı</i>"
+    if len(score_msg) > 3000:
+        score_msg = score_msg[:2900] + "\n\n<i>...metin çok uzun olduğu için kırpıldı.</i>"
     try:
         await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
     except Exception as e:
-        logger.error(f"HTML Edit Hatasi: {e}\nIcerik: {score_msg}")
-        # Hata olursa düz metin olarak gönder ki bot takılmasın
-        await msg.edit_text(score_msg)
+        logger.error(f"HTML Edit Hatasi: {e}")
+        # Hata olursa tagları temizleyip gönder ki en azından okunabilsin
+        clean_msg = score_msg.replace("<b>","").replace("</b>","").replace("<i>","").replace("</i>","")
+        await msg.edit_text(clean_msg[:4000])
 
     # 6. Post önizleme + aksiyon butonları
     post_preview = (
