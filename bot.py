@@ -538,7 +538,7 @@ FORMAT:
 
 Türkçe yaz. Uydurma YAPMA."""
 
-    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=800)
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
@@ -700,55 +700,77 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST TASARIMI ────────────────────────────────────────────────────────────
-POST_FOOTER = """
------------------------------------------
-🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
-📢 @kriptodropduyuru 
-🎁 @kriptodroptr
------------------------------------------
-"""
-
+# ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
-TASARIM KURALLARI (BU STİLE %100 UY):
-(1) Başlık formatı: 🚀 **[Platform] [Başlık]!** 🎁
-(2) Adımları mutlaka (1), (2), (3) şeklinde numaralandır.
-(3) Linkleri mutlaka » **[İsim]:** ⚡️ [🔗 TIKLA 🖊] ⚡️ şeklinde yaz. (Mavi » karakterini kullan)
-(4) Airdrop puanı: ⭐⭐⭐⭐⭐ (Skora göre 1-5 arası yıldız)
-(5) Örnek:
-🚀 **Binance TR Yeni Üye!** 🎁
-Summary text 🤑
------------------------------------------
-🔥 **YAPMAN GEREKENLER:**
-(1) Kayıt ol
-(2) KYC tamamla
------------------------------------------
-» **Hemen Kaydol:** ⚡️ [🔗 TIKLA 🖊] ⚡️
-Görev zorluğu: Kolay
-Airdrop puanı: ⭐⭐⭐⭐⭐
-🗓 **Kampanya Dönemi:** [Tarih]
-"""
+
+⛔ KESİN YASAKLAR:
+1. Analizde OLMAYAN rakam, kod, URL yazma
+2. Referral/promo kodu ASLA yazma
+3. Hashtag (#) yasak
+4. Şablon metnini ("yoksa sil" gibi) posta bırakma
+5. Link için sadece: [🔗 TIKLA 🖊]
+6. Türkçe | HTML: <b>kalın</b>
+
+KISALTMA KURALLARI:
+- Ödül yoksa → "Kampanya ödülü"
+- Son tarih yoksa → o satırı komple sil
+- Adım yoksa → o adımı komple sil
+
+AYNEN bu yapıyı kullan:
+
+🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
+
+[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
+
+—————————————————
+💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
+🤑 [ödül miktarı]
+
+—————————————————
+🎯 <b>YAPMAN GEREKENLER:</b>
+
+🥇 [adım 1]
+🥈 [adım 2]
+🥉 [adım 3]
+🏅 [adım 4 — yoksa sil]
+
+🗓 Son gün [son tarih — yoksa bu satırı sil]
+
+—————————————————
+➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+
+<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
+<b>Ödül miktarı:</b> [rakam]
+<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+
+—————————————————
+🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
+📢 @kriptodropduyuru
+🎁 @kriptodroptr"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ Kalınlık için: **metin** | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
 
-🚀 **[PLATFORM] — [BAŞLIK]!** 🎁
-Summary text 🤑
+YAPI:
+🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
 
-(1) [adım 1]
-(2) [adım 2]
------------------------------------------
-» **Kaydol:** [🔗 TIKLA 🖊]"""
+🤑 <b>Ödül:</b> [rakam]
+🥇 [adım 1]
+🥈 [adım 2]
+
+➡️ [🔗 TIKLA 🖊]
+📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ Kalınlık için: **metin** | Link: [🔗 TIKLA 🖊] | Türkçe
+HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
 
-🚀 **[PLATFORM]** — [ödül] kazan! 🚀
-» **Link:** [🔗 TIKLA 🖊]"""
+FORMAT:
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
+📢 @kriptodropduyuru 🎁 @kriptodroptr"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -768,14 +790,11 @@ def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
     """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        content = ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
+        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
     elif fmt == "summary":
-        content = ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
+        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
     else:
-        content = ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
-    
-    # SABİT FOOTER EKLE
-    return content + POST_FOOTER
+        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -819,73 +838,41 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji Map (Verified Unique IDs) ───────────────────────────
-# HTML mode: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
+# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 CE = {
-    "🚀": "5368324170671202286",  # Roket
-    "🔥": "5431321415494215242",  # Ateş
-    "🎁": "5431411586529035136",  # Hediye
-    "💰": "5431321415490021396",  # Para
-    "⚡️": "5431627943585579051", # Şimşek (Varyasyonlu)
-    "⚡": "5431627943585579051",  # Şimşek
-    "✅": "5431321415515187219",  # Onay
-    "📢": "5431627943594002447",  # Duyuru
-    "💎": "5431411586512257041",  # Elmas
-    "🥇": "5431627943581384725",  # 1. (Altın)
-    "🥈": "5431627943585579050",  # 2.
-    "🥉": "5431627943572996117",  # 3.
-    "📍": "5431627943589773312",  # Konum/Nokta
-    "🔹": "5431627943572996118",  # Mavi parlayan
-    "⭐": "5431627943585579051",  # Yıldız
-    "🤑": "5431411586533229598",  # Para ağızlı
+    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
+    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
+    "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
+    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
+    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
+    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
+    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
+    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
+    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
+    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
 }
-
-def apply_custom_emojis(text: str) -> str:
-    """Metindeki standart emojileri Premium animasyonlu versiyonlarıyla değiştir."""
-    import re
-    # ⛔ GÜVENLİK: Eğer metin zaten <tg-emoji> içeriyorsa veya çok karmaşıksa hata almamak için 
-    # placeholder yöntemi kullanıyoruz.
-    
-    # Değiştirilecek emojileri listele
-    sorted_emojis = sorted(CE.keys(), key=len, reverse=True)
-    
-    # 1. Mevcut HTML etiketlerini ve linkleri korumaya al (placeholder)
-    placeholders = []
-    def to_placeholder(match):
-        placeholders.append(match.group(0))
-        return f"__PH{len(placeholders)-1}__"
-    
-    # Etiketleri koru
-    text = re.sub(r'<[^>]+>', to_placeholder, text)
-    
-    # 2. Sadece düz metin kalan yerlerde emojileri değiştir
-    for emoji in sorted_emojis:
-        if emoji in text:
-            eid = CE[emoji]
-            # Emoji tagını placeholder olmadan direkt yerleştir (çünkü içinde başka tag yok)
-            text = text.replace(emoji, f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>')
-    
-    # 3. Korumaya aldığımız etiketleri geri koy
-    for i, ph_val in enumerate(placeholders):
-        text = text.replace(f"__PH{i}__", ph_val)
-        
-    return text
 
 def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def md_to_html(text: str) -> str:
-    """Metni Telegram HTML formatına çevirir (Sıfır Hata Garantili)."""
+    """AI'nin ürettiği Markdown benzeri metni Telegram HTML'e çevir."""
     import re
-    if not text: return ""
-    
-    # 1. Kaçış işlemleri
-    text = html_escape(text)
-    
-    # 2. Kalınlıkları çevir (** -> <b>)
+    # Hashtag temizle
+    text = re.sub(r'(?m)^#+\s.*$', "", text)
+    text = re.sub(r'#\w+', "", text)
+    # **bold** → <b>bold</b>
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-    
+    # *bold* → <b>bold</b>
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
+    # _italic_ → <i>italic</i>
+    text = re.sub(r'_(.+?)_', r'<i>\1</i>', text)
+    # `code` → <code>code</code>
+    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    # Birden fazla boş satırı teke indir
+    text = re.sub(r'\n{3,}', "\n\n", text)
     return text.strip()
 
 def safe_md(text: str) -> str:
@@ -1034,6 +1021,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode=ParseMode.HTML,
                     reply_markup=post_actions(has_link=True),
                 )
+        else:
+            preview = (
+                f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
+                f"Hazır! Gruba gönderebilirsin."
+            )
+            if len(preview) > 4096:
+                preview = preview[:4086] + "_"
+            await update.message.reply_text(
+                preview,
+                parse_mode=ParseMode.HTML,
+                reply_markup=post_actions(has_link=True),
+            )
         return
 
     # Post düzenleme
@@ -1135,13 +1134,10 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     context.user_data["last_analysis"] = analysis
 
     # 4. Post oluştur
-    await msg.edit_text("✍️ **Post hazırlanıyor...**", parse_mode=ParseMode.HTML)
+    await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
     post = build_post(analysis, project_name)
-    
-    # ⛔ KESİN ÇÖZÜM: Sadece Bold (Kalın) yazı kullanıyoruz
-    final_post_html = md_to_html(post)
-    context.user_data["last_post"]          = final_post_html
-    context.user_data["final_post"]         = final_post_html
+    context.user_data["last_post"]          = post
+    context.user_data["final_post"]         = post
     context.user_data["last_post_platform"] = project_name
     context.user_data["has_link"]           = False
     context.user_data["post_fmt"]           = "long"
@@ -1149,52 +1145,38 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Postu arşive kaydet
     save_post_archive(project_name, post, "long")
 
-
-    # ⛔ GÜVENLİK: Markdown'dan HTML'e çevirirken hata riskini sıfırlıyoruz
-    # 5. Güvenilirlik raporunu hazırlayıp göster
+    # 5. Güvenilirlik raporunu göster
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
     score_msg = (
-        f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
+        f"📊 <b>GÜVENİLİRLİK RAPORU — {project_name.upper()}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: {badge}\n\n"
-        f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
-        f"{analysis}\n\n"
-        f"🤖 **[v2.6 - KESİN ÇÖZÜM]**"
+        f"Skor: <b>{badge}</b>\n\n"
+        f"📋 <b>Değerlendirme:</b>\n{reasons_text}\n"
     )
-    
-    # Önce Markdown olarak kes, sonra HTML yap (Hata riskini sıfırlar)
-    if len(score_msg) > 3000:
-        score_msg = score_msg[:2900] + "..."
-    
-    score_html = md_to_html(score_msg)
-    
-    try:
-        await msg.edit_text(score_html, parse_mode=ParseMode.HTML)
-    except Exception as e:
-        logger.error(f"Rapor HTML Hatasi: {e}")
-        # Hala hata alırsak tagları temizleyip düz gönder (Plan B)
-        import re
-        clean_msg = re.sub(r'<[^>]+>', '', score_html).replace("**", "")
-        await msg.edit_text(clean_msg[:4000])
+    if warning:
+        score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
+    score_msg += f"\n{safe_md(analysis)}"
 
-    # 6. Post önizleme (Görsel stile sadık kalınarak)
+    if len(score_msg) > 4000:
+        score_msg = score_msg[:3990] + "\n<i>...kırpıldı</i>"
+    await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
+
+    # 6. Post önizleme + aksiyon butonları
     post_preview = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🚀 **HAZIRLANAN POST:**\n\n"
-        f"{final_post_html}\n\n"
+        f"📣 <b>HAZIRLANAN POST:</b>\n\n"
+        f"{safe_md(post)}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"Skor: {badge}"
     )
-    
-    try:
-        await update.effective_message.reply_text(
-            post_preview,
-            parse_mode=ParseMode.HTML,
-            reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
-        )
-    except Exception as e:
-        logger.error(f"Onizleme Hatasi: {e}")
-        await update.effective_message.reply_text("⚠️ Post önizlemesi hazırlandı (Filtresiz).")
+    if len(post_preview) > 4096:
+        post_preview = post_preview[:4086] + "..."
+
+    await update.effective_message.reply_text(
+        post_preview,
+        parse_mode=ParseMode.HTML,
+        reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
+    )
 
 # ══════════════════════════════════════════════════════════
 #  GRUBA GÖNDERME
