@@ -732,21 +732,23 @@ Airdrop puanı: ⭐⭐⭐⭐⭐
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ Kalınlık için: **metin** | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Maks 350 karakter | Türkçe
+✅ Kalınlık için: **metin** | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
 
 🚀 **[PLATFORM] — [BAŞLIK]!** 🎁
-🤑 **Ödül:** [rakam]
-🥇 [adım 1]
-🥈 [adım 2]
-⚡️ [🔗 TIKLA 🖊] ⚡️"""
+Summary text 🤑
+
+(1) [adım 1]
+(2) [adım 2]
+-----------------------------------------
+» **Kaydol:** [🔗 TIKLA 🖊]"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ Kalınlık için: **metin** | Link: ⚡️ [🔗 TIKLA 🖊] ⚡️ | Türkçe
+✅ Kalınlık için: **metin** | Link: [🔗 TIKLA 🖊] | Türkçe
 
 🚀 **[PLATFORM]** — [ödül] kazan! 🚀
-➡️ ⚡️ [🔗 TIKLA 🖊] ⚡️"""
+» **Link:** [🔗 TIKLA 🖊]"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -1163,7 +1165,7 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Postu arşive kaydet
     save_post_archive(project_name, post, "long")
 
-    # 5. Güvenilirlik raporunu göster
+    # 5. Güvenilirlik raporunu hazırlayıp göster
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
     score_msg = (
         f"📊 **GÜVENİLİRLİK RAPORU — {project_name.upper()}**\n"
@@ -1171,19 +1173,22 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         f"Skor: {badge}\n\n"
         f"📋 **Değerlendirme:**\n{reasons_text}\n\n"
         f"{analysis}\n\n"
-        f"🤖 *[v2.2 - Kararlı Sürüm]*"
+        f"🤖 *[v2.3 - Kararlı Sürüm]*"
     )
 
-    # Raporu HTML formatına çevir (Hatasız olması için manuel işliyoruz)
+    # ⛔ KRİTİK DÜZELTME: Önce Markdown metni kesiyoruz (Safe Slicing)
+    # Bu, HTML etiketlerinin (<b> gibi) ortadan bölünmesini engeller.
+    if len(score_msg) > 3000:
+        score_msg = score_msg[:2950] + "\n\n**...metin çok uzun olduğu için kırpıldı.**"
+    
+    # Kesildikten sonra HTML'e çeviriyoruz (Tüm etiketler artık tam ve sağlıklı)
     score_html = md_to_html(score_msg)
-    if len(score_html) > 3800:
-        score_html = score_html[:3700] + "\n\n<i>...kırpıldı.</i>"
     
     try:
         await msg.edit_text(score_html, parse_mode=ParseMode.HTML)
     except Exception as e:
         logger.error(f"Rapor HTML Hatasi: {e}")
-        # Hata olursa tagları silip düz gönder
+        # Hala hata alırsak tagları temizleyip düz gönder (Plan B)
         import re
         clean_msg = re.sub(r'<[^>]+>', '', score_html).replace("**", "")
         await msg.edit_text(clean_msg[:4000])
