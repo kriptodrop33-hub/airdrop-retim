@@ -750,51 +750,52 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
+# ── POST_SYSTEM: Yeni format — başlık + zorluk + ödül + adımlar + rozet ──────
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
 
 ⛔ KESİN YASAKLAR:
-1. Analizde OLMAYAN rakam, kod, URL yazma
-2. Referral/promo kodu ASLA yazma
+1. Analizde OLMAYAN rakam, tarih, URL yazma
+2. Referral / promo kodu ASLA yazma
 3. Hashtag (#) yasak
-4. Şablon metnini ("yoksa sil" gibi) posta bırakma
-5. Link için sadece: [🔗 TIKLA 🖊]
-6. Türkçe | HTML: <b>kalın</b>
+4. Şablon ifadelerini ("yoksa sil" gibi) bırakma
+5. Link için SADECE: [🔗 TIKLA 🖊]  ← bunu değiştirme
+6. Türkçe | HTML biçimlendirme: <b>kalın</b>
 
 KISALTMA KURALLARI:
-- Ödül yoksa → "Kampanya ödülü"
-- Son tarih yoksa → o satırı komple sil
-- Adım yoksa → o adımı komple sil
+- Bilgi yoksa o satırı / bölümü komple SİL — boş bırakma
+- Kampanya tarihi yoksa o satırı sil
+- 4. adım yoksa 🏅 satırını sil
 
-AYNEN bu yapıyı kullan:
+AYNEN bu yapıyı kullan (hiç değiştirme):
 
-🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
+🚀 <b>[PLATFORM ADI] — [FIRSATI ANLATAN ÇARPICI BAŞLIK]!</b> 🎁
 
-[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
+[Tek cümle — fırsatı çekici anlat] ✨
+⚡ <b>Görev zorluğu:</b> [Kolay / Orta / Zor]
 
-—————————————————
-💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
-🤑 [ödül miktarı]
+────────────────
+💸 <b>KAZANABİLECEĞİN ÖDÜL:</b>
+🤑 [KAYNAKTAN birebir alınan ödül miktarı]
 
-—————————————————
+────────────────
 🎯 <b>YAPMAN GEREKENLER:</b>
 
-🥇 [adım 1]
-🥈 [adım 2]
-🥉 [adım 3]
-🏅 [adım 4 — yoksa sil]
+🥇 [1. adım]
+🥈 [2. adım]
+🥉 [3. adım]
+🏅 [4. adım — yoksa bu satırı sil]
 
-🗓 Son gün [son tarih — yoksa bu satırı sil]
+────────────────
+📅 <b>Kampanya Dönemi:</b> [başlangıç — bitiş tarihi — yoksa satırı sil]
+⏰ <b>Son Tarih:</b> [son tarih — yoksa "Devam ediyor"]
 
-—————————————————
-➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+────────────────
+🔗 <b>Hemen Katıl →</b> [🔗 TIKLA 🖊]
 
-<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
-<b>Ödül miktarı:</b> [rakam]
-<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+[🟢 GÜVENİLİR / 🟡 ŞÜPHELİ / 🔴 RİSKLİ] <b>·</b> [1 cümle neden]
 
-—————————————————
-🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
+────────────────
+🔔 Daha fazla fırsat için kanalı pinle 📣
 📢 @kriptodropduyuru
 🎁 @kriptodroptr"""
 
@@ -804,13 +805,17 @@ POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
 
 YAPI:
-🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
+🚀 <b>[PLATFORM] — [BAŞLIK]!</b> ✨
 
-🤑 <b>Ödül:</b> [rakam]
+💸 <b>Ödül:</b> [kaynaktaki rakam]
+⚡ <b>Zorluk:</b> [Kolay/Orta/Zor]
+
 🥇 [adım 1]
 🥈 [adım 2]
+🥉 [adım 3]
 
-➡️ [🔗 TIKLA 🖊]
+🔗 [🔗 TIKLA 🖊]
+[🟢 GÜVENİLİR / 🟡 ŞÜPHELİ / 🔴 RİSKLİ]
 📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
@@ -819,8 +824,8 @@ POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
 
 FORMAT:
-🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
-📢 @kriptodropduyuru 🎁 @kriptodroptr"""
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! ✨ [1 cümle nasıl]. 🔗 [🔗 TIKLA 🖊]
+[🟢 GÜVENİLİR / 🟡 ŞÜPHELİ / 🔴 RİSKLİ] · 📢 @kriptodropduyuru 🎁 @kriptodroptr"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -840,11 +845,12 @@ def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
     """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
+        post = ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
+        post = ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+        post = ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+    return inject_premium_emojis(post)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -888,20 +894,92 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
+# ── Premium Custom Emoji ID'leri — Gerçek paket ID'leri ──────────────────────
+# Kaynaklar: Emojiset104, NewsEmoji, Decoration_Pack, TONEmoji, AnimatedAsianEmoji
 # HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 CE = {
-    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
-    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
-    "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
-    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
-    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
-    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
-    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
-    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
-    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
-    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
+    # ── Animasyonlu (NewsEmoji / TONEmoji / AnimatedAsianEmoji) ──
+    "fire":     "<tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji>",   # NewsEmoji
+    "diamond":  "<tg-emoji emoji-id=\"5427168083074628963\">💎</tg-emoji>",   # NewsEmoji
+    "rocket":   "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",   # TONEmoji
+    "moneybag": "<tg-emoji emoji-id=\"5233326571099534068\">💸</tg-emoji>",   # NewsEmoji
+    "warn":     "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>",   # NewsEmoji
+    "crown":    "<tg-emoji emoji-id=\"5217822164362739968\">👑</tg-emoji>",   # NewsEmoji
+    "chart":    "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",   # NewsEmoji
+    "trophy":   "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",   # TONEmoji
+    "bell":     "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",   # NewsEmoji
+    "link":     "<tg-emoji emoji-id=\"5271604874419647061\">🔗</tg-emoji>",   # NewsEmoji
+    "speaker":  "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",   # Emojiset104
+    "mega":     "<tg-emoji emoji-id=\"5424818078833715060\">📣</tg-emoji>",   # NewsEmoji
+    "bulb":     "<tg-emoji emoji-id=\"5422439311196834318\">💡</tg-emoji>",   # NewsEmoji
+    "gold":     "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",   # NewsEmoji
+    "silver":   "<tg-emoji emoji-id=\"5447203607294265305\">🥈</tg-emoji>",   # NewsEmoji
+    "bronze":   "<tg-emoji emoji-id=\"5453902265922376865\">🥉</tg-emoji>",   # NewsEmoji
+    "medal":    "<tg-emoji emoji-id=\"5424746623462823358\">🏅</tg-emoji>",   # TONEmoji
+    "party":    "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",   # NewsEmoji
+    "target":   "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",   # TONEmoji
+    "sparkle":  "<tg-emoji emoji-id=\"5325547803936572038\">✨</tg-emoji>",   # NewsEmoji
+    "glow":     "<tg-emoji emoji-id=\"5208801655004350721\">🌟</tg-emoji>",   # AnimatedAsianEmoji
+    "gift":     "<tg-emoji emoji-id=\"5203996991054432397\">🎁</tg-emoji>",   # AnimatedAsianEmoji
+    "rich":     "<tg-emoji emoji-id=\"5391292736647209211\">🤑</tg-emoji>",   # AnimatedAsianEmoji
+    "chat":     "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",   # NewsEmoji
+    "puzzle":   "<tg-emoji emoji-id=\"5213306719215577669\">🧩</tg-emoji>",   # TONEmoji
+    "green":    "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",   # NewsEmoji
+    "red":      "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",   # NewsEmoji
+    "dizzy":    "<tg-emoji emoji-id=\"5215423854624645141\">💫</tg-emoji>",   # Decoration_Pack
+    # ── Video (Emojiset104 / Decoration_Pack) ──
+    "money":    "<tg-emoji emoji-id=\"6235340371082086934\">💰</tg-emoji>",   # Emojiset104
+    "clock":    "<tg-emoji emoji-id=\"6235362644782484636\">⏰</tg-emoji>",   # Emojiset104
+    "check":    "<tg-emoji emoji-id=\"5217497254381754877\">✅</tg-emoji>",   # Decoration_Pack
+    "gem":      "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",   # Decoration_Pack
+    "calendar": "<tg-emoji emoji-id=\"5213240855892073022\">📅</tg-emoji>",   # Decoration_Pack (yakın)
 }
+
+# Standart emoji → premium <tg-emoji> eşlemesi (postlarda otomatik değiştirilir)
+_EMOJI_MAP = {
+    "🔥": CE["fire"],
+    "💎": CE["diamond"],
+    "🚀": CE["rocket"],
+    "💸": CE["moneybag"],
+    "⚠️": CE["warn"],
+    "👑": CE["crown"],
+    "📈": CE["chart"],
+    "🏆": CE["trophy"],
+    "🔔": CE["bell"],
+    "🔗": CE["link"],
+    "📢": CE["speaker"],
+    "📣": CE["mega"],
+    "💡": CE["bulb"],
+    "🥇": CE["gold"],
+    "🥈": CE["silver"],
+    "🥉": CE["bronze"],
+    "🏅": CE["medal"],
+    "🎉": CE["party"],
+    "🎯": CE["target"],
+    "✨": CE["sparkle"],
+    "🌟": CE["glow"],
+    "🎁": CE["gift"],
+    "🤑": CE["rich"],
+    "💬": CE["chat"],
+    "🧩": CE["puzzle"],
+    "🟢": CE["green"],
+    "🔴": CE["red"],
+    "💫": CE["dizzy"],
+    "💰": CE["money"],
+    "⏰": CE["clock"],
+    "✅": CE["check"],
+    "💠": CE["gem"],
+    "📅": CE["calendar"],
+}
+
+def inject_premium_emojis(text: str) -> str:
+    """
+    AI'nin ürettiği postaki standart emojileri premium <tg-emoji> taglarıyla değiştirir.
+    Sadece HTML parse mode ile çalışır.
+    """
+    for std_emoji, premium_tag in _EMOJI_MAP.items():
+        text = text.replace(std_emoji, premium_tag)
+    return text
 
 def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
