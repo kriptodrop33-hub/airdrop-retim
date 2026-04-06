@@ -33,6 +33,7 @@ UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "")
 ADMIN_CHAT_ID       = int(os.environ.get("ADMIN_CHAT_ID", "0"))
 GROUP_CHAT_ID       = int(os.environ.get("GROUP_CHAT_ID", "0"))
 
+# Railway ve local için veri klasörü
 _DATA_DIR = "data"
 os.makedirs(_DATA_DIR, exist_ok=True)
 _DATA_FILE = os.path.join(_DATA_DIR, "bot_data.json")
@@ -101,7 +102,7 @@ def _load_data_sync() -> dict:
 async def _load_data() -> dict:
     return await asyncio.to_thread(_load_data_sync)
 
-def _save_data_sync(data: dict):
+def _save_data_sync( dict):
     try:
         with open(_DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -191,7 +192,6 @@ async def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75) -> 
     for model in ["llama-3.3-70b-versatile", "llama3-70b-8192", "llama-3.1-8b-instant", "gemma2-9b-it"]:
         if model in _groq_exhausted: continue
         try:
-            # Async wrapper for blocking Groq call
             r = await asyncio.to_thread(
                 groq_client.chat.completions.create,
                 model=model,
@@ -208,7 +208,7 @@ async def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75) -> 
                 _groq_exhausted.add(model)
                 continue
             elif "429" in err_str:
-                await asyncio.sleep(2) # Non-blocking sleep
+                await asyncio.sleep(2)
                 try:
                     r2 = await asyncio.to_thread(
                         groq_client.chat.completions.create,
@@ -320,7 +320,7 @@ async def research_airdrop_by_url(url: str) -> dict:
     raw = f"=== SAYFA İÇERİĞİ ===\n{content}\n\n=== EK KAYNAKLAR ===\n{extra_text}"
     return {"name": name_hint.strip(), "raw": raw, "sources": extra[:6], "url": url}
 
-async def verify_and_score(name: str, initial_data: dict) -> dict:
+async def verify_and_score(name: str, initial_ dict) -> dict:
     extra_queries = [f"{name} legit scam review reddit 2026", f"{name} official website social media verified"]
     extra_results = []
     for q in extra_queries:
@@ -344,7 +344,7 @@ def format_score_badge(score: int, verdict: str) -> str:
     elif score >= 50: return f"🟡 {verdict} ({score}/100)"
     return f"🔴 {verdict} ({score}/100)"
 
-async def analyze_research(data: dict) -> str:
+async def analyze_research( dict) -> str:
     system = """Sen deneyimli bir kripto fırsat araştırmacısısın. HAM VERİDEN SADECE gerçek bilgileri çıkar. Rakamlar kaynaktan kopyalanacak.
 FORMAT:
 📌 PLATFORM/PROJE: [adı]
@@ -472,7 +472,7 @@ Türkçe yaz.
 ────────────────
 
 🔔 Daha fazla airdrop için duyuru kanalını pinle 📌
-📢 @kriptodropduyuru
+ @kriptodropduyuru
 🎁 @kriptodroptr
 
 ——
@@ -496,8 +496,8 @@ POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
 HTML: kalın | Link: `[🔗 TIKLA 🖊]` | Türkçe
 FORMAT:
-🎁 [PLATFORM] — [ödül] kazan! ✨ [1 cümle nasıl]. 🔗 [🔗 TIKLA 🖊]
-[🟢/🟡/🔴] · 📢 @kriptodropduyuru 🎁 @kriptodroptr"""
+🎁 [PLATFORM] — [ödül] kazan! ✨ [1 cümle nasıl]. 🔗 [ TIKLA 🖊]
+[🟢//🔴] ·  @kriptodropduyuru 🎁 @kriptodroptr"""
 
 def _build_prompt(analysis: str, project_name: str) -> str:
     # Analiz içindeki skor/uyarı kısımlarını temizle
@@ -513,7 +513,7 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"5. [🔗 TIKLA 🖊] placeholder'ını koru"
     )
 
-async def build_post(analysis: str, project_name: str, score_data: dict = None, fmt: str = "long") -> str:
+async def build_post(analysis: str, project_name: str, score_ dict = None, fmt: str = "long") -> str:
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
         post = await ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
