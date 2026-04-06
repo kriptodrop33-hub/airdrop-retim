@@ -579,7 +579,7 @@ FORMAT:
 
 Türkçe yaz. Uydurma YAPMA."""
 
-    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000, temp=0.1)
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
@@ -714,11 +714,20 @@ KESİN REDDET (listeye ekleme):
 ❌ Rakamı belirsiz/eksik fırsatlar
 ❌ Sadece "yakında" diyip tarih vermeyen projeler
 
+⛔⛔⛔ RAKAM KURALLARI — KESİN YASAK ⛔⛔⛔
+- Ödül miktarını YALNIZCA kaynak metinde kelimesi kelimesine yazan rakamdan al
+- Kaynak metinde rakam geçmiyorsa "Belirtilmemiş" yaz — asla tahmin etme, asla uydurma
+- "up to 30,000 USDT" yazıyorsa → "30.000 USDT'ye kadar" yaz, farklı bir rakam YAZMA
+- "up to 1,710 USDT" yazıyorsa → "1.710 USDT'ye kadar" yaz, "30.000" veya başka rakam YAZMA
+- Birden fazla ödül kademesi varsa SADECE kaynaktaki rakamları yaz, toplamını kendin hesaplama
+- Kaynak URL'si olmayan fırsatı listeye EKLEME
+- Rakamları birleştirme, çarpma, toplama YAPMA — kaynak ne diyorsa onu yaz
+
 FORMAT (HER fırsat için AYNEN bu yapıyı kullan):
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🎁 [BORSA/PLATFORM ADI]
-┣ 💰 Ödül: [EXACT rakam — örn: 2600 TL / 50 USDT / 100 TOKEN]
+┣ 💰 Ödül: [SADECE KAYNAKTAN ALINAN EXACT rakam ve ifade]
 ┣ 🏦 Tür: [borsa bonusu / airdrop / referral / görev]
 ┣ 👥 Kimler: [yeni kullanıcı / mevcut / herkes]
 ┣ 📋 Adımlar:
@@ -730,12 +739,12 @@ FORMAT (HER fırsat için AYNEN bu yapıyı kullan):
 ┗ 🔗 [kayıt/katılım URL]
 
 KURALLAR:
-- Somut rakam yaz: "50 USDT", "2600 TL", "500 TOKEN"
-- Kaynak veride olmayan rakamı YAZMA
+- Rakam SADECE kaynak metinden — uydurma, tahmin, birleştirme, hesaplama YAPMA
+- Kaynak ne kadar yazıyorsa o kadar yaz — fazlasını YAZMA
 - 4-6 kaliteli fırsat listele, gereksiz olanları atla
 - Türkçe yaz, net ve anlaşılır ol"""
 
-    return ai(system, combined_raw[:8000], tokens=3500)
+    return ai(system, combined_raw[:8000], tokens=3500, temp=0.1)
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
