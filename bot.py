@@ -750,7 +750,7 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Yeni format — başlık + zorluk + ödül + adımlar + rozet ──────
+# ── POST_SYSTEM: Sade format — görsel 2 benzeri ──────────────────────────────
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
 
 ⛔ KESİN YASAKLAR:
@@ -759,61 +759,55 @@ POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postlar
 3. Hashtag (#) yasak
 4. Şablon ifadelerini ("yoksa sil" gibi) bırakma
 5. Link için SADECE: [🔗 TIKLA 🖊]  ← bunu değiştirme
-6. Türkçe | HTML biçimlendirme: <b>kalın</b>
+6. Türkçe | HTML: <b>kalın</b>
 
 KISALTMA KURALLARI:
-- Bilgi yoksa o satırı / bölümü komple SİL — boş bırakma
+- Bilgi yoksa o satırı komple SİL — boş bırakma
 - Kampanya tarihi yoksa o satırı sil
-- 4. adım yoksa 🏅 satırını sil
+- 4. adım yoksa 4️⃣ satırını sil
 
-AYNEN bu yapıyı kullan (hiç değiştirme):
+AYNEN bu yapıyı kullan:
 
-🚀 <b>[PLATFORM ADI] — [FIRSATI ANLATAN ÇARPICI BAŞLIK]!</b> 🎁
+🚀 <b>[PLATFORM ADI] [BAŞLIK]!</b> 🎁
 
 [Tek cümle — fırsatı çekici anlat] ✨
-⚡ <b>Görev zorluğu:</b> [Kolay / Orta / Zor]
 
 ────────────────
-💸 <b>KAZANABİLECEĞİN ÖDÜL:</b>
-🤑 [KAYNAKTAN birebir alınan ödül miktarı]
+✅ <b>YAPMAN GEREKENLER:</b>
 
-────────────────
-🎯 <b>YAPMAN GEREKENLER:</b>
-
-🥇 [1. adım]
-🥈 [2. adım]
-🥉 [3. adım]
-🏅 [4. adım — yoksa bu satırı sil]
-
-────────────────
-📅 <b>Kampanya Dönemi:</b> [başlangıç — bitiş tarihi — yoksa satırı sil]
-⏰ <b>Son Tarih:</b> [son tarih — yoksa "Devam ediyor"]
+1️⃣ [1. adım]
+2️⃣ [2. adım]
+3️⃣ [3. adım]
+4️⃣ [4. adım — yoksa bu satırı sil]
 
 ────────────────
 🔗 <b>Hemen Katıl →</b> [🔗 TIKLA 🖊]
 
-[🟢 GÜVENİLİR / 🟡 ŞÜPHELİ / 🔴 RİSKLİ] <b>·</b> [1 cümle neden]
+💡 <b>Görev zorluğu:</b> [Kolay / Orta / Zor]
+💸 <b>Ödül miktarı:</b> [KAYNAKTAN birebir alınan rakam]
+[🟢 GÜVENİLİR / 🟡 ŞÜPHELİ / 🔴 RİSKLİ] · [1 cümle neden]
+
+📅 <b>Kampanya Dönemi:</b> [tarihler — yoksa bu satırı sil]
+⏰ <b>Son Tarih:</b> [tarih — yoksa "Devam ediyor"]
 
 ────────────────
-🔔 Daha fazla fırsat için kanalı pinle 📣
+🔔 Daha fazla fırsat için kanalı pinle 📌
 📢 @kriptodropduyuru
 🎁 @kriptodroptr"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 300 karakter | Türkçe
 
 YAPI:
 🚀 <b>[PLATFORM] — [BAŞLIK]!</b> ✨
 
-💸 <b>Ödül:</b> [kaynaktaki rakam]
-⚡ <b>Zorluk:</b> [Kolay/Orta/Zor]
+1️⃣ [adım 1]
+2️⃣ [adım 2]
+3️⃣ [adım 3]
 
-🥇 [adım 1]
-🥈 [adım 2]
-🥉 [adım 3]
-
+💸 <b>Ödül:</b> [rakam] · 💡 [Kolay/Orta/Zor]
 🔗 [🔗 TIKLA 🖊]
 [🟢 GÜVENİLİR / 🟡 ŞÜPHELİ / 🔴 RİSKLİ]
 📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
@@ -936,6 +930,7 @@ CE = {
 }
 
 # Standart emoji → premium <tg-emoji> eşlemesi (postlarda otomatik değiştirilir)
+# NOT: 1️⃣ 2️⃣ 3️⃣ 4️⃣ ve 📌 paketlerde yok → standart emoji olarak kalır (bu iyidir)
 _EMOJI_MAP = {
     "🔥": CE["fire"],
     "💎": CE["diamond"],
