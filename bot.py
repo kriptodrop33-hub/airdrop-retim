@@ -1469,9 +1469,9 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
 
     post = build_post(analysis, project_name, score_data=score_data)
     
-    final_post_html = md_to_html(post)
-    context.user_data["last_post"]          = final_post_html
-    context.user_data["final_post"]         = final_post_html
+    # ⛔ HAM METİN olarak kaydet — HTML dönüşümü SADECE gönderim/önizleme anında yapılacak
+    context.user_data["last_post"]          = post
+    context.user_data["final_post"]         = post
     context.user_data["last_post_platform"] = project_name
     context.user_data["has_link"]           = False
     context.user_data["post_fmt"]           = "long"
@@ -1513,7 +1513,7 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     post_preview = (
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🚀 <b>HAZIRLANAN POST:</b>\n\n"
-        f"{final_post_html}\n\n"
+        f"{safe_md(post)}\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"Skor: {badge} | 📡 {total_sources} kaynak"
     )
