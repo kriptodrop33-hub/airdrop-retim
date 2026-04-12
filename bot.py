@@ -1974,3 +1974,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ══════════════════════════════════════════════════════════
 #  ANA
 # ══════════════════════════════════════════════════════════
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    # Tüm handler'lar sadece PRIVATE (DM) mesajlarını işler — grup/kanal tamamen yoksayılır
+    private = filters.ChatType.PRIVATE
+
+    app.add_handler(CommandHandler("start",     cmd_start,     filters=private))
+    app.add_handler(CommandHandler("help",      cmd_help,      filters=private))
+    app.add_handler(CommandHandler("scan",      cmd_scan,      filters=private))
+    app.add_handler(CommandHandler("post",      cmd_post,      filters=private))
+    app.add_handler(CommandHandler("sendgroup", cmd_sendgroup, filters=private))
+
+    app.add_handler(CallbackQueryHandler(handle_callback))  # callback guard'ı decorator'da
+    app.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, handle_message))
+
+    logger.info("🚀 Airdrop Bot başlatıldı.")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
