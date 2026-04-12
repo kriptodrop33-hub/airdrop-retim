@@ -1089,23 +1089,41 @@ async def typing(update: Update):
 
 # ── Premium Custom Emoji Map (Verified Unique IDs) ───────────────────────────
 # HTML mode: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+# Post şablonunda kullanılan TÜM emojiler burada tanımlı olmalıdır.
 CE = {
-    "🚀": "5368324170671202286",  # Roket
-    "🔥": "5431321415494215242",  # Ateş
-    "🎁": "5431411586529035136",  # Hediye
-    "💰": "5431321415490021396",  # Para
+    # ── Ana Post Emojileri ────────────────────────────────────────────────
+    "🚀": "5368324170671202286",  # Roket — başlık
+    "🔥": "5431321415494215242",  # Ateş — YAPMAN GEREKENLER + footer
+    "🎁": "5431411586529035136",  # Hediye — başlık + footer
+    "💰": "5431321415490021396",  # Para — ödül
+    "🤑": "5431411586533229598",  # Para ağızlı — özet sonu
+    "⭐": "5431627943585579051",  # Yıldız — airdrop puanı
+    "🔗": "5431627943572996118",  # Link — kayıt linki
+    "📅": "5431627943589773312",  # Takvim — kampanya dönemi
+    "📢": "5431627943594002447",  # Duyuru — footer kanal
+    "✅": "5431321415515187219",  # Onay — durum/aktif
+    "💎": "5431411586512257041",  # Elmas — premium
+    # ── Analiz/Rapor Emojileri ────────────────────────────────────────────
+    "📊": "5431627943585579050",  # Grafik — güvenilirlik raporu
+    "📡": "5431627943581384725",  # Anten — kaynak sayısı
+    "🔍": "5431627943572996117",  # Büyüteç — araştırma
+    "🔬": "5431627943594002447",  # Mikroskop — derin araştırma
+    "📋": "5431627943589773312",  # Pano — adımlar
+    "🏷": "5431627943572996118",  # Etiket — tür
+    "👥": "5431627943581384725",  # İnsanlar — kimler katılabilir
+    "🎯": "5431411586529035136",  # Hedef — görev
+    # ── Ek Emojiler ──────────────────────────────────────────────────────
     "⚡️": "5431627943585579051", # Şimşek (Varyasyonlu)
     "⚡": "5431627943585579051",  # Şimşek
-    "✅": "5431321415515187219",  # Onay
-    "📢": "5431627943594002447",  # Duyuru
-    "💎": "5431411586512257041",  # Elmas
     "🥇": "5431627943581384725",  # 1. (Altın)
     "🥈": "5431627943585579050",  # 2.
     "🥉": "5431627943572996117",  # 3.
     "📍": "5431627943589773312",  # Konum/Nokta
     "🔹": "5431627943572996118",  # Mavi parlayan
-    "⭐": "5431627943585579051",  # Yıldız
-    "🤑": "5431411586533229598",  # Para ağızlı
+    "📌": "5431627943589773312",  # Raptiye — takip
+    "🟢": "5431321415515187219",  # Yeşil daire — güvenilir
+    "🟡": "5431627943585579051",  # Sarı daire — şüpheli
+    "🔴": "5431321415494215242",  # Kırmızı daire — riskli
 }
 
 def apply_custom_emojis(text: str) -> str:
@@ -1526,27 +1544,31 @@ async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, wit
 
     platform = context.user_data.get("last_post_platform", "cryptocurrency airdrop")
 
+    # ── Premium emojileri uygula ─────────────────────────────────────────
+    premium_post = apply_custom_emojis(safe_md(post))
+
     try:
         if with_photo:
             img_url = get_image(f"{platform} crypto blockchain token")
             caption = post[:1024] if len(post) > 1024 else post
+            premium_caption = apply_custom_emojis(safe_md(caption))
             if img_url:
                 await context.bot.send_photo(
                     chat_id=GROUP_CHAT_ID,
                     photo=img_url,
-                    caption=safe_md(caption),
+                    caption=premium_caption,
                     parse_mode=ParseMode.HTML,
                 )
             else:
                 await context.bot.send_message(
                     chat_id=GROUP_CHAT_ID,
-                    text=safe_md(post),
+                    text=premium_post,
                     parse_mode=ParseMode.HTML,
                 )
         else:
             await context.bot.send_message(
                 chat_id=GROUP_CHAT_ID,
-                text=safe_md(post),
+                text=premium_post,
                 parse_mode=ParseMode.HTML,
             )
 
@@ -1952,25 +1974,3 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ══════════════════════════════════════════════════════════
 #  ANA
 # ══════════════════════════════════════════════════════════
-
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    # Tüm handler'lar sadece PRIVATE (DM) mesajlarını işler — grup/kanal tamamen yoksayılır
-    private = filters.ChatType.PRIVATE
-
-    app.add_handler(CommandHandler("start",     cmd_start,     filters=private))
-    app.add_handler(CommandHandler("help",      cmd_help,      filters=private))
-    app.add_handler(CommandHandler("scan",      cmd_scan,      filters=private))
-    app.add_handler(CommandHandler("post",      cmd_post,      filters=private))
-    app.add_handler(CommandHandler("sendgroup", cmd_sendgroup, filters=private))
-
-    app.add_handler(CallbackQueryHandler(handle_callback))  # callback guard'ı decorator'da
-    app.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, handle_message))
-
-    logger.info("🚀 Airdrop Bot başlatıldı.")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == "__main__":
-    main()
