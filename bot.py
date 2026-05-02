@@ -655,8 +655,10 @@ KRİTİK KURALLAR:
 FORMAT (HER ALANI DOLDUR — bilgi yoksa "Bulunamadı" yaz):
 
 📌 PLATFORM/PROJE: [adı — ne olduğu (borsa/DeFi/L2/GameFi vb.)]
-🏷 FIRSATIN TÜRÜ: [borsa bonusu / airdrop / kampanya / referral / sosyal görev]
+🏷 FIRSATIN TÜRÜ: [borsa bonusu / airdrop / kampanya / referral / testnet / retroactive / node / learn / nft]
 💰 ÖDÜL MİKTARI: [kaynaktaki EXACT rakam — yoksa: Belirtilmemiş]
+💼 PROJE YATIRIMI (FUND): [Projenin topladığı yatırım miktarı - yoksa: Belirtilmemiş]
+🐦 TWITTER (X) TAKİPÇİ: [Takipçi sayısı - yoksa: Belirtilmemiş]
    📎 KAYNAK: [Bilginin alındığı URL]
 👥 KİMLER KATILABİLİR: [yeni kullanıcı / mevcut kullanıcı / herkes]
 🌍 ÜLKE KISITI: [Varsa yaz — yoksa: Kısıtlama belirtilmemiş]
@@ -696,20 +698,24 @@ def _build_opportunity_queries() -> list[tuple[str, str]]:
         # Borsa yeni kullanıcı bonusu — güncel + Türkçe borsalar dahil
         ("bonus", f"kripto borsa yeni üye kampanyası kayıt ödülü {m} USDT TL aktif"),
         ("bonus", f"crypto exchange new user bonus welcome reward USDT {m} site:binance.com OR site:bybit.com OR site:okx.com OR site:cointr.com"),
-        ("bonus", f"crypto exchange sign up reward deposit bonus free USDT {m} active"),
-        ("bonus", f"borsa kayıt kampanyası hediye {m} site:cointr.com OR site:paribu.com OR site:btcturk.com"),
         # Referral / davet kampanyası
         ("referral", f"crypto referral program earn USDT invite friends commission {m} active"),
-        ("referral", f"kripto borsa arkadaş davet et kazan referral ödülü {m}"),
         # İşlem / trading kampanyası
         ("kampanya", f"crypto exchange trading competition reward prize USDT {m}"),
-        ("kampanya", f"kripto borsa işlem kampanyası ödül havuzu {m}"),
         # Telegram / sosyal görev ödülü
         ("sosyal", f"telegram crypto bot task reward earn token USDT {m}"),
-        ("sosyal", f"crypto project telegram galxe zealy task reward points {m}"),
         # Klasik kolay airdrop — güncel ay
         ("airdrop", f"crypto airdrop claim {m} active free no investment required"),
-        ("airdrop", f"galxe zealy intract quest airdrop reward {m} active"),
+        # Testnet
+        ("testnet", f"crypto incentivized testnet airdrop guide {m} active"),
+        # Retroactive
+        ("retroactive", f"crypto retroactive airdrop snapshot not taken {m}"),
+        # Node / Validator
+        ("node", f"crypto run node validator incentivized testnet reward {m}"),
+        # Learn & Earn
+        ("learn", f"crypto learn and earn quiz answers free token {m}"),
+        # NFT / Whitelist
+        ("nft", f"crypto free NFT mint whitelist giveaway {m} active"),
     ]
 
 # Geriye dönük uyumluluk için sabit liste (dinamik fonksiyon çağrılmazsa)
@@ -718,12 +724,17 @@ OPPORTUNITY_QUERIES = _build_opportunity_queries()
 
 # Kategori tanımları — kullanıcıya gösterilen label ve filtre key'i
 CATEGORY_DEFS = {
-    "hepsi":    ("🌐 Hepsi",          None),           # filtre yok
-    "bonus":    ("🎁 Borsa Bonusu",   ["bonus"]),
-    "referral": ("👥 Referral",       ["referral"]),
-    "kampanya": ("🏆 Kampanya",       ["kampanya"]),
-    "sosyal":   ("📱 Sosyal Görev",   ["sosyal"]),
-    "airdrop":  ("🪂 Airdrop",        ["airdrop"]),
+    "hepsi":       ("🌐 Hepsi",          None),           # filtre yok
+    "bonus":       ("🎁 Borsa Bonusu",   ["bonus"]),
+    "referral":    ("👥 Referral",       ["referral"]),
+    "kampanya":    ("🏆 Kampanya",       ["kampanya"]),
+    "sosyal":      ("📱 Sosyal Görev",   ["sosyal"]),
+    "airdrop":     ("🪂 Airdrop",        ["airdrop"]),
+    "testnet":     ("🛠 Testnet",        ["testnet"]),
+    "retroactive": ("🔙 Retroactive",    ["retroactive"]),
+    "node":        ("🖥 Node/Validator", ["node"]),
+    "learn":       ("📚 Öğren Kazan",    ["learn"]),
+    "nft":         ("🖼 NFT/Whitelist",  ["nft"]),
 }
 
 
@@ -795,11 +806,16 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
         by_cat.setdefault(cat, []).append(r)
 
     cat_labels = {
-        "bonus":    "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
-        "referral": "👥 REFERRAL / DAVET KAMPANYASI",
-        "kampanya": "🏆 İŞLEM / TRADİNG KAMPANYASI",
-        "sosyal":   "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
-        "airdrop":  "🪂 AIRDROP",
+        "bonus":       "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
+        "referral":    "👥 REFERRAL / DAVET KAMPANYASI",
+        "kampanya":    "🏆 İŞLEM / TRADİNG KAMPANYASI",
+        "sosyal":      "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
+        "airdrop":     "🪂 AIRDROP",
+        "testnet":     "🛠 TESTNET GÖREVLERİ",
+        "retroactive": "🔙 RETROACTIVE AIRDROP",
+        "node":        "🖥 NODE / VALIDATOR KURULUMU",
+        "learn":       "📚 ÖĞREN KAZAN",
+        "nft":         "🖼 ÜCRETSİZ NFT MİNT / WHITELIST",
     }
 
     combined_raw = f"BUGÜNÜN TARİHİ: {now_tr}\nARAMA DÖNEMİ: {now_label}\nTOPLAM SONUÇ: {len(raw_results)}\n"
@@ -860,11 +876,13 @@ KURALLAR:
 
 # ── POST TASARIMI ────────────────────────────────────────────────────────────
 POST_FOOTER = """
-━━━━━━━━━━━━━━━━━━━
+__________________________________
+__________________________________
+
 🔥 Daha fazla airdrop için duyuru kanalını pinle
 📢 @kriptodropduyuru
 🎁 @kriptodroptr
-━━━━━━━━━━━━━━━━━━━
+__________________________________
 """
 
 POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için Türkçe airdrop/fırsat postları hazırlıyorsun.
@@ -879,7 +897,7 @@ KESİN UYULACAK TASARIM KURALLARI:
 - Hashtag (#) kullanma
 - Uzun paragraf blokları oluşturma — açıklamalar KISA olacak
 - HTML tag kullanma
-- Ayırıcı uzunluğunu değiştirme
+- Ayırıcı çizgileri değiştirme
 
 ✅ BİREBİR UYULACAK ŞABLON:
 
@@ -887,63 +905,62 @@ KESİN UYULACAK TASARIM KURALLARI:
 
 [1-2 KISA cümle — ödülü ve fırsatı net anlat] 🤑
 
-━━━━━━━━━━━━━━━━━━━
+__________________________________
 🔥 YAPMAN GEREKENLER:
 
-①  [Adım 1 — kaynak metinden, kısa ve net]
-②  [Adım 2 — kaynak metinden, kısa ve net]
-③  [Adım 3 — varsa, yoksa bu satırı SİL]
-④  [Adım 4 — yalnızca varsa, yoksa SİL]
+① [Adım 1 — kaynak metinden, kısa ve net]
+② [Adım 2 — kaynak metinden, kısa ve net]
+③ [Adım 3 — varsa, yoksa bu satırı SİL]
+④ [Adım 4 — yalnızca varsa, yoksa SİL]
 
-━━━━━━━━━━━━━━━━━━━
-»» Hemen Kaydol: 🔗 [🔗 TIKLA 🖊] 🔗
-»» Etkinlik Sayfası: 🔗 [🔗 TIKLA 🖊] 🔗  ← yalnızca ayrı link varsa ekle, yoksa SİL
+__________________________________
+»» Hemen Kaydol: 🔗 [🔗 TIKLA ↗]🔗
+»» Etkinlik Sayfası: 🔗 [🔗 TIKLA ↗]🔗  ← yalnızca ayrı link varsa ekle, yoksa SİL
 
 Görev zorluğu: [Kolay / Orta / Zor]
-Ödül miktarı:  [Kaynaktaki EXACT rakam — yoksa: Belirtilmemiş]
+Ödül miktarı: [Kaynaktaki EXACT rakam — yoksa: Belirtilmemiş]
 Airdrop puanı: [⭐ sayısı skora göre: ⭐⭐⭐⭐⭐]
 
-📅 Kampanya Dönemi: [Tarih aralığı — kaynaktan kopyala — yoksa: Belirtilmemiş]
-━━━━━━━━━━━━━━━━━━━
+📆 Kampanya Dönemi: [Tarih aralığı — kaynaktan kopyala — yoksa: Belirtilmemiş]
+__________________________________
 
 KRİTİK KURALLAR:
 1. Adım numaraları MUTLAKA ① ② ③ ④ ⑤ daireli unicode kullan — başka format YASAK
-2. Ayırıcı: ━━━━━━━━━━━━━━━━━━━ (19 adet ━ çizgi) — uzunluğu değiştirme
-3. Link satırı: »» [İsim]: 🔗 [🔗 TIKLA 🖊] 🔗 — bu formatı koru, URL yazma
+2. Ayırıcı çizgileri tam olarak 34 alt çizgi karakteriyle "__________________________________" kullan
+3. Link satırı: »» [İsim]: 🔗 [🔗 TIKLA ↗]🔗 — bu formatı koru, URL yazma
 4. Ödül rakamı kaynakta yoksa: "Belirtilmemiş" yaz, ASLA uydurma
 5. Tüm bölümler arasında 1 boş satır bırak
 6. Başlıkta 🚀 ... 🎁 emojileri MUTLAKA kullan
 7. Özet cümlesi 🤑 ile bitecek
 8. "YAPMAN GEREKENLER" başlığı 🔥 ile başlayacak
 9. Adım açıklamaları KISA — her adım EN FAZLA 1-2 kısa cümle
-10. Kampanya dönemi 📅 emojisi ile başlayacak
+10. Kampanya dönemi 📆 emojisi ile başlayacak
 11. Görev zorluğu, Ödül miktarı, Airdrop puanı — her biri ayrı satır, KISA
 12. Türkçe yaz — İngilizce kelime mümkünse kullanma
-13. Hat [🔗 TIKLA 🖊] bırak — link placeholder kaldırılmayacak
+13. Hat [🔗 TIKLA ↗] bırak — link placeholder kaldırılmayacak
 
 ÖRNEK ÇIKTI (birebir bu formata uy):
 
-🚀 Binance TR Yeni Üye Bonusu! 🎁
+🚀 BitMart Büyük Harcama Kampanyası! 🎁
 
-Yeni kullanıcılar için 880 TL bonus kazanma fırsatı 🤑
+520 USDT bonus kazanma fırsatı sunuyor 🤑
 
-━━━━━━━━━━━━━━━━━━━
+__________________________________
 🔥 YAPMAN GEREKENLER:
 
-①  Promosyona katılım için kayıt olun
-②  Kayıt olduktan sonra etkinlik sayfasına git otomatik kaydolur
-③  İlk para yatırma işlemini tamamla
+① BitMart'a kayıt olun
+② Büyük harcama yapın
 
-━━━━━━━━━━━━━━━━━━━
-»» Hemen Kaydol: 🔗 [🔗 TIKLA 🖊] 🔗
-»» Etkinlik Sayfası: 🔗 [🔗 TIKLA 🖊] 🔗
+__________________________________
+»» Hemen Kaydol: 🔗 [🔗 TIKLA ↗]🔗
+»» Etkinlik Sayfası: 🔗 [🔗 TIKLA ↗]🔗
 
 Görev zorluğu: Kolay
-Ödül miktarı:  880 TL
-Airdrop puanı: ⭐⭐⭐⭐⭐
+Ödül miktarı: 520 USDT
+Airdrop puanı: ⭐⭐⭐⭐
 
-📅 Kampanya Dönemi: 16.03.2026 Saat 16.00 - 09.04.2026 Saat 23.59
-━━━━━━━━━━━━━━━━━━━
+📆 Kampanya Dönemi: Son tarih belirsiz — güncelliği doğrulanamadı
+__________________________________
 """
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
@@ -955,23 +972,23 @@ POST_SYSTEM_SHORT = """KriptoDropTR için KISA airdrop postu yaz.
 
 [1 kısa cümle özet] 🤑
 
-━━━━━━━━━━━━━━━━━━━
+__________________________________
 🔥 YAPMAN GEREKENLER:
 
-①  [adım 1 — kısa]
-②  [adım 2 — kısa]
-③  [adım 3 — varsa]
+① [adım 1 — kısa]
+② [adım 2 — kısa]
+③ [adım 3 — varsa]
 
-━━━━━━━━━━━━━━━━━━━
-»» Kaydol: 🔗 [🔗 TIKLA 🖊] 🔗
+__________________________________
+»» Kaydol: 🔗 [🔗 TIKLA ↗]🔗
 
 Ödül: [kaynaktaki rakam — yoksa Belirtilmemiş]
 Airdrop puanı: [⭐⭐⭐⭐⭐]
 
-📅 Kampanya: [Tarih — yoksa Belirtilmemiş]
-━━━━━━━━━━━━━━━━━━━
+📆 Kampanya Dönemi: [Tarih — yoksa Belirtilmemiş]
+__________________________________
 
-KURALLAR: Adımlar ① ② ③ | Ayırıcı ━━━━━━━━━━━━━━━━━━━ (19 adet) | Maks 400 karakter | Türkçe"""
+KURALLAR: Adımlar ① ② ③ | Ayırıcı __________________________________ (34 alt çizgi) | Maks 400 karakter | Türkçe"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SUMMARY = """KriptoDropTR için 3-4 satır airdrop ÖZET postu yaz.
@@ -979,12 +996,12 @@ POST_SYSTEM_SUMMARY = """KriptoDropTR için 3-4 satır airdrop ÖZET postu yaz.
 ✅ BİREBİR bu şablona uy:
 
 🚀 [PLATFORM] — [ödül varsa yaz, yoksa 'aktif kampanya'] kazan! 🎁
-━━━━━━━━━━━━━━━━━━━
-①  [en önemli adım]
-②  [ikinci adım]
-━━━━━━━━━━━━━━━━━━━
-»» Kaydol: 🔗 [🔗 TIKLA 🖊] 🔗
-📅 [Tarih — yoksa Belirtilmemiş]"""
+__________________________________
+① [en önemli adım]
+② [ikinci adım]
+__________________________________
+»» Kaydol: 🔗 [🔗 TIKLA ↗]🔗
+📆 [Tarih — yoksa Belirtilmemiş]"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -999,13 +1016,14 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"5. Adımları analizden al, kendin adım uydurma — her adım KISA (1-2 cümle)\n"
         f"6. Ödül miktarı analizde geçmiyorsa 'Belirtilmemiş' yaz, uydurma\n"
         f"7. Analizde 'SONA ERMİŞ' veya 'geçmiş tarih' yazıyorsa post üretme — sadece uyarı yaz\n"
-        f"8. [🔗 TIKLA 🖊] placeholder'ını KORU — URL yazma, değiştirme\n"
-        f"9. Link satırı formatı: »» [İsim]: 🔗 [🔗 TIKLA 🖊] 🔗\n"
-        f"10. Ayırıcı: ━━━━━━━━━━━━━━━━━━━ (19 adet ━) — daha uzun/kısa YAPMA\n"
+        f"8. [🔗 TIKLA ↗] placeholder'ını KORU — URL yazma, değiştirme\n"
+        f"9. Link satırı formatı: »» [İsim]: 🔗 [🔗 TIKLA ↗]🔗\n"
+        f"10. Ayırıcı çizgileri tam olarak: __________________________________ kullan.\n"
         f"11. Başlık emojileri: 🚀 ... 🎁 — MUTLAKA kullan\n"
         f"12. Açıklamalar ORTA KISALIKTA — 1-2 cümle, detaylı ama kısa\n"
-        f"13. Kampanya dönemi 📅 ile başlasın\n"
-        f"14. Airdrop puanını analizdeki güvenilirlik yıldızıyla eşleştir"
+        f"13. Kampanya dönemi 📆 ile başlasın\n"
+        f"14. Görev zorluğunu belirle (Kolay / Orta / Zor).\n"
+        f"15. Airdrop puanını analizdeki güvenilirlik yıldızıyla eşleştir"
     )
 
 
@@ -1100,9 +1118,11 @@ CE = {
     "⭐": "5431627943585579051",  # Yıldız — airdrop puanı
     "🔗": "5431627943572996118",  # Link — kayıt linki
     "📅": "5431627943589773312",  # Takvim — kampanya dönemi
+    "📆": "5431627943589773312",  # Takvim alternatif
     "📢": "5431627943594002447",  # Duyuru — footer kanal
     "✅": "5431321415515187219",  # Onay — durum/aktif
     "💎": "5431411586512257041",  # Elmas — premium
+    "↗": "5431627943572996118",   # Yönlendirme (Link ok)
     # ── Analiz/Rapor Emojileri ────────────────────────────────────────────
     "📊": "5431627943585579050",  # Grafik — güvenilirlik raporu
     "📡": "5431627943581384725",  # Anten — kaynak sayısı
