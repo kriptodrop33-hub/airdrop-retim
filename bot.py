@@ -1329,21 +1329,30 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "scan":
         msg = await q.message.reply_text(
-            "🌐 *Taranıyor...*\n_Tüm kripto fırsatları aranıyor (30-50 sn)_",
+            "🌐 <b>Taranıyor...</b>\n<i>Tüm kripto fırsatları aranıyor (30-50 sn)</i>",
             parse_mode=ParseMode.HTML,
         )
-        await update.effective_chat.send_action(ChatAction.TYPING)
-        result = scan_active_airdrops()
+        stop_ev = asyncio.Event()
+        async def _typ1():
+            while not stop_ev.is_set():
+                try: await update.effective_chat.send_action(ChatAction.TYPING)
+                except: pass
+                await asyncio.sleep(4)
+        t1 = asyncio.create_task(_typ1())
+        try:
+            result = await asyncio.to_thread(scan_active_airdrops)
+        except Exception as e:
+            result = f"❌ Tarama hatası: {e}"
+        finally:
+            stop_ev.set(); t1.cancel()
         context.user_data["last_scan"] = result
-
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
             [InlineKeyboardButton("🔄 Yeniden Tara", callback_data="scan"),
              InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
         ])
-        text = f"✅ *FIRSATLAR TARANDII*\n\n{safe_md(result)}"
-        if len(text) > 4096:
-            text = text[:4086] + "_"
+        text = f"✅ <b>FIRSATLAR TARANDII</b>\n\n{safe_md(result)}"
+        if len(text) > 4096: text = text[:4086] + "..."
         await msg.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
     elif data == "manual_post":
@@ -1389,29 +1398,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         analysis = context.user_data.get("last_analysis")
         project  = context.user_data.get("last_project", "")
         fmt      = context.user_data.get("post_fmt", "long")
+        score_data = context.user_data.get("last_score", {})
+        score   = score_data.get("score") if score_data else None
+        verdict = score_data.get("verdict") if score_data else None
         if not analysis:
             await q.message.reply_text("⚠️ Yenilemek için önce bir araştırma yap.")
             return
         fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet"}
         msg = await q.message.reply_text(
-            f"♻️ *{fmt_label.get(fmt,'Post')} yeniden yazılıyor...*",
+            f"♻️ <b>{fmt_label.get(fmt,'Post')} yeniden yazılıyor...</b>",
             parse_mode=ParseMode.HTML,
         )
-        post = build_post(analysis, project, fmt=fmt)
-        context.user_data["last_post"]   = post
-        context.user_data["final_post"]  = post
-        context.user_data["has_link"]    = False
-        preview = (
-            f"♻️ *YENİLENEN POST ({fmt_label.get(fmt,'').upper()}):*\n\n{safe_md(post)}\n\n"
-            f"👇 *🔗 Link Ekle* butonuna bas, sonra gruba gönder."
-        )
-        if len(preview) > 4096:
-            preview = preview[:4086] + "_"
-        await msg.edit_text(
-            preview,
-            parse_mode=ParseMode.HTML,
-            reply_markup=post_actions(has_link=False, fmt=fmt),
-        )
+        post = await asyncio.to_thread(build_post, analysis, project, fmt, score, verdict)
+        context.user_data["last_post"]  = post
+        context.user_data["final_post"] = post
+        context.user_data["has_link"]   = False
+        preview = f"♻️ <b>YENİLENEN POST ({fmt_label.get(fmt,'').upper()}):</b>\n\n{post}\n\n☝️ <b>🔗 Link Ekle</b> butonuna bas."
+        if len(preview) > 4096: preview = preview[:4086] + "..."
+        await msg.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=fmt))
 
     elif data in ("fmt_long", "fmt_short", "fmt_summary"):
         analysis = context.user_data.get("last_analysis")
@@ -1419,33 +1423,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not analysis:
             await q.answer("⚠️ Önce bir araştırma yap.", show_alert=True)
             return
-        fmt_map  = {"fmt_long": "long", "fmt_short": "short", "fmt_summary": "summary"}
+        fmt_map   = {"fmt_long": "long", "fmt_short": "short", "fmt_summary": "summary"}
         fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet"}
         fmt = fmt_map[data]
+        score_data = context.user_data.get("last_score", {})
+        score   = score_data.get("score") if score_data else None
+        verdict = score_data.get("verdict") if score_data else None
         await q.answer(f"{fmt_label[fmt]} format seçildi...")
         msg = await q.message.reply_text(
-            f"{fmt_label[fmt]} *format hazırlanıyor...*",
+            f"{fmt_label[fmt]} <b>format hazırlanıyor...</b>",
             parse_mode=ParseMode.HTML,
         )
-        post = build_post(analysis, project, fmt=fmt)
+        post = await asyncio.to_thread(build_post, analysis, project, fmt, score, verdict)
         context.user_data["last_post"]  = post
         context.user_data["final_post"] = post
         context.user_data["has_link"]   = False
         context.user_data["post_fmt"]   = fmt
+        icon = "📄" if fmt=="long" else "📝" if fmt=="short" else "⚡"
+        preview = f"{icon} <b>{fmt_label[fmt].upper()} FORMAT:</b>\n\n{post}\n\n🔗 <b>Link Ekle</b> butonuna bas."
+        if len(preview) > 4096: preview = preview[:4086] + "..."
+        await msg.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=fmt))
 
-        preview = (
-            f"{'📄' if fmt=='long' else '📝' if fmt=='short' else '⚡'} "
-            f"*{fmt_label[fmt].upper()} FORMAT:*\n\n"
-            f"{safe_md(post)}\n\n"
-            f"👇 *🔗 Link Ekle* butonuna bas, sonra gruba gönder."
-        )
-        if len(preview) > 4096:
-            preview = preview[:4086] + "_"
-        await msg.edit_text(
-            preview,
-            parse_mode=ParseMode.HTML,
-            reply_markup=post_actions(has_link=False, fmt=fmt),
-        )
 
     elif data == "scan_menu":
         await q.message.reply_text(
@@ -1457,26 +1455,35 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif data.startswith("cat_"):
-        cat_key = data[4:]   # "cat_bonus" → "bonus"
+        cat_key = data[4:]
         _, cats = CATEGORY_DEFS.get(cat_key, ("Hepsi", None))
         cat_label, _ = CATEGORY_DEFS.get(cat_key, ("🌐 Hepsi", None))
         msg = await q.message.reply_text(
-            f"🌐 *{cat_label} taranıyor...*\n_30-50 saniye sürebilir_",
+            f"🌐 <b>{cat_label} taranıyor...</b>\n<i>30-50 saniye sürebilir</i>",
             parse_mode=ParseMode.HTML,
         )
-        await update.effective_chat.send_action(ChatAction.TYPING)
-        result = scan_active_airdrops(cats=cats)
+        stop_ev2 = asyncio.Event()
+        async def _typ2():
+            while not stop_ev2.is_set():
+                try: await update.effective_chat.send_action(ChatAction.TYPING)
+                except: pass
+                await asyncio.sleep(4)
+        t2 = asyncio.create_task(_typ2())
+        try:
+            result = await asyncio.to_thread(scan_active_airdrops, cats)
+        except Exception as e:
+            result = f"❌ Tarama hatası: {e}"
+        finally:
+            stop_ev2.set(); t2.cancel()
         context.user_data["last_scan"] = result
-
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✍️ Birini Seç & Post Oluştur", callback_data="manual_post")],
             [InlineKeyboardButton("🔄 Yeniden Tara", callback_data=data),
              InlineKeyboardButton("🔍 Kategori Değiştir", callback_data="scan_menu")],
             [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")],
         ])
-        text = f"✅ *{cat_label.upper()} TARAMASI TAMAMLANDI*\n\n{safe_md(result)}"
-        if len(text) > 4096:
-            text = text[:4086] + "_"
+        text = f"✅ <b>{cat_label.upper()} TARAMASI TAMAMLANDI</b>\n\n{safe_md(result)}"
+        if len(text) > 4096: text = text[:4086] + "..."
         await msg.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
     # ── Link Yönetimi ─────────────────────────────────────────────────
