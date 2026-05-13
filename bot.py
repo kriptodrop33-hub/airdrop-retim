@@ -584,7 +584,7 @@ FORMAT:
 
 Türkçe yaz. Uydurma YAPMA."""
 
-    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2500)
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
@@ -742,7 +742,7 @@ KURALLAR:
 - 4-6 kaliteli fırsat listele, gereksiz olanları atla
 - Türkçe yaz, net ve anlaşılır ol"""
 
-    return ai(system, combined_raw[:8000], tokens=3500)
+    return ai(system, combined_raw[:8000], tokens=4000)
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
@@ -843,9 +843,41 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
         f"4. Adımları analizden al, kendin adım uydurma\n"
         f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma\n"
-        f"6. Kampanya tarihi bugünden önce ise postu YAZMA, sadece 'KAMPANYA SONA ERMİŞ' yaz\n"
+        f"6. Kampanya tarihi eski görünse bile POSTU YAZ — NOT satırına 'Kampanya durumu doğrulanamamıştır, katılmadan önce kontrol ediniz' ekle\n"
         f"7. tg-emoji HTML taglarını (örn: <tg-emoji emoji-id=...>) aynen koru, silme"
     )
+
+
+def _inject_premium_emojis(text: str) -> str:
+    """
+    AI çıktısındaki düz emojileri Telegram Premium tg-emoji sürümleriyle değiştirir.
+    tg-emoji zaten varsa tekrar eklemez — güvenli idempotent çalışır.
+    """
+    _MAP = [
+        ("🔥", CE["fire"]),
+        ("🚀", CE["rocket"]),
+        ("⭐", CE["star"]),
+        ("💰", CE["money"]),
+        ("⚡", CE["warn"]),
+        ("✅", CE["check"]),
+        ("🎁", CE["gift"]),
+        ("👑", CE["crown"]),
+        ("📈", CE["chart"]),
+        ("🏆", CE["trophy"]),
+        ("🔔", CE["bell"]),
+        ("📌", CE["pin"]),
+        ("🎉", CE["tada"]),
+        ("💠", CE["gem"]),
+        ("🥇", CE["medal1"]),
+        ("🗒", CE["note"]),
+        ("📅", CE["cal"]),
+        ("📢", CE["mega"]),
+        ("➡️", CE["arrow"]),
+    ]
+    for plain, tg in _MAP:
+        if plain in text and tg not in text:
+            text = text.replace(plain, tg)
+    return text
 
 
 def build_post(analysis: str, project_name: str, fmt: str = "long", score: int = None, verdict: str = None) -> str:
@@ -857,6 +889,9 @@ def build_post(analysis: str, project_name: str, fmt: str = "long", score: int =
         raw = ai(get_post_system_summary(), prompt, tokens=250, temp=0.3)
     else:
         raw = ai(get_post_system(), prompt, tokens=1400, temp=0.3)
+
+    # Premium emoji inject — AI tagları kaçırmış olsa bile garantile
+    raw = _inject_premium_emojis(raw)
 
     # Skoru programatik olarak ekle (AI yerine gerçek skoru kullan)
     if fmt == "long" and score is not None:
@@ -1192,6 +1227,23 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     enriched_data = data.copy()
     enriched_data["raw"] = data.get("raw","") + "\n\n=== DOĞRULAMA ===\n" + score_data.get("extra_raw","")
     analysis = await asyncio.to_thread(analyze_research, enriched_data)
+
+    # Analiz başarısız → devam etme, kullanıcıyı bilgilendir
+    if analysis.startswith("❌"):
+        await msg.edit_text(
+            f"⚠️ <b>Groq API şu an yanıt veremiyor.</b>\n\n"
+            f"Tüm modeller denendi, yanıt alınamadı.\n"
+            f"• Groq günlük kotanızı kontrol edin\n"
+            f"• 1-2 dakika bekleyip tekrar deneyin\n\n"
+            f"<i>Proje: {project_name} | Skor: {badge}</i>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔄 Tekrar Dene", callback_data="new_research"),
+                InlineKeyboardButton("🏠 Ana Menü", callback_data="home"),
+            ]]),
+        )
+        return
+
     context.user_data["last_analysis"] = analysis
 
     # 4. Post oluştur (gerçek skoru geç)
