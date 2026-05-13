@@ -441,14 +441,15 @@ def get_image(query: str = "cryptocurrency airdrop") -> str | None:
 
 def research_airdrop_by_name(name: str) -> dict:
     """
-    Platform/proje adına göre araştırma.
-    Tavily: 3 sorgu × 4 sonuç = 12 istek (eski: 5×5=25)
+    Platform/proje adına göre araştırma — sadece aktif 2025/2026 kampanyalar.
     """
-    # Sadece en etkili 3 sorgu — kredi tasarrufu
+    from datetime import datetime
+    current_year = datetime.now().year
+    current_month = datetime.now().strftime("%B %Y")
     queries = [
-        f"{name} new user bonus reward how to claim 2026",
-        f"{name} airdrop tasks eligibility reward amount 2026",
-        f"{name} kripto kampanya kayıt bonusu nasıl alınır",
+        f"{name} airdrop bonus reward active {current_month} how to claim",
+        f"{name} new user bonus reward tasks eligibility {current_year}",
+        f"{name} kripto kampanya kayıt bonusu aktif Mayıs {current_year}",
     ]
     all_results = []
     for q in queries:
@@ -499,7 +500,8 @@ def research_airdrop_by_url(url: str) -> dict:
         tokens=50, temp=0.1
     )
 
-    extra = deep_search(f"{name_hint} airdrop claim guide tasks 2025", max_results=6)
+    from datetime import datetime
+    extra = deep_search(f"{name_hint} airdrop claim guide tasks {datetime.now().year} active", max_results=6)
     extra_text = "\n\n".join([
         f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:400]}"
         for i, r in enumerate(extra[:6])
@@ -546,22 +548,22 @@ Türkçe yaz. Uydurma YAPMA."""
 # Borsa kayıt bonusu + kampanya ağırlıklı, airdrop destekli
 OPPORTUNITY_QUERIES = [
     # Borsa yeni kullanıcı bonusu — Türkçe borsalar dahil
-    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü 2026 USDT TL Mart aktif"),
-    ("bonus", "crypto exchange new user bonus welcome reward USDT 2025 site:binance.com OR site:bybit.com OR site:okx.com OR site:cointr.com OR site:bitlo.com"),
-    ("bonus", "crypto exchange sign up reward deposit bonus free USDT 2026"),
-    ("bonus", "borsa kayıt kampanyası hediye 2025 site:cointr.com OR site:paribu.com OR site:btcturk.com"),
+    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü Mayıs 2026 USDT TL aktif devam ediyor"),
+    ("bonus", "crypto exchange new user sign up bonus reward USDT May 2026 active ongoing"),
+    ("bonus", "crypto exchange welcome bonus deposit reward free USDT 2026 new users"),
+    ("bonus", "borsa kayıt kampanyası hediye Mayıs 2026 aktif site:cointr.com OR site:paribu.com OR site:btcturk.com"),
     # Referral / davet kampanyası
-    ("referral", "crypto referral program earn USDT invite friends commission 2025 2026"),
-    ("referral", "kripto borsa arkadaş davet et kazan referral ödülü 2025"),
+    ("referral", "crypto referral program earn USDT invite friends 2026 active ongoing"),
+    ("referral", "kripto borsa arkadaş davet et kazan referral ödülü Mayıs 2026"),
     # İşlem / trading kampanyası
-    ("kampanya", "crypto exchange trading competition reward prize USDT 2025 2026"),
-    ("kampanya", "kripto borsa işlem kampanyası ödül havuzu 2025"),
+    ("kampanya", "crypto exchange trading competition reward prize USDT May 2026 active"),
+    ("kampanya", "kripto borsa işlem kampanyası ödül havuzu 2026 devam ediyor"),
     # Telegram / sosyal görev ödülü
-    ("sosyal", "telegram crypto bot task reward earn token USDT 2025"),
-    ("sosyal", "crypto project telegram task reward points 2025 airdrop"),
+    ("sosyal", "telegram crypto task reward earn token USDT 2026 active"),
+    ("sosyal", "crypto project telegram task reward airdrop May 2026 ongoing"),
     # Klasik kolay airdrop
-    ("airdrop", "crypto airdrop claim March 2026 active free no investment required"),
-    ("airdrop", "galxe zealy intract quest airdrop reward March 2026 active"),
+    ("airdrop", "crypto airdrop claim May 2026 active free no investment required ongoing"),
+    ("airdrop", "galxe zealy intract quest airdrop reward May 2026 active not expired"),
 ]
 
 
@@ -656,8 +658,9 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
             u = item["url"]
             c = item["content"]
             combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
-    system = """Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
-Amacın: Sıradan bir kullanıcının GERÇEKTEN para kazanabileceği, somut rakamlı, BUGÜN AKTİF fırsatları bulmak.
+    from datetime import datetime
+    system = f"""Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
+Bugünün tarihi: {datetime.now().strftime('%d %B %Y')}. SADECE bu tarihten sonraki veya devam eden aktif kampanyaları listele.
 
 ÖNCELİK SIRASI:
 1. 🎁 Borsa kayıt bonusu — yeni üye ol, az emekle somut TL/USDT kazan
@@ -666,12 +669,13 @@ Amacın: Sıradan bir kullanıcının GERÇEKTEN para kazanabileceği, somut rak
 4. 📱 Telegram/sosyal görev — kolay görevler, token kazan
 5. 🪂 Airdrop — form doldur, sosyal takip, token kazan
 
-KESİN REDDET (listeye ekleme):
+KESİN REDDET — bunları ASLA listele:
+❌ Sona erme tarihi bugünden önce olan kampanyalar
+❌ 2024 ve öncesi tarihli kampanyalar
 ❌ Validator/node çalıştırma gerektiren
 ❌ 1000$+ yatırım zorunlu olanlar
-❌ Tarihi geçmiş kampanyalar (2024 ve öncesi)
-❌ Rakamı belirsiz/eksik fırsatlar
-❌ Sadece "yakında" diyip tarih vermeyen projeler
+❌ Rakamı belirsiz/eksik veya sadece 'yakında' diyen projeler
+❌ Scam/fraud/fake geçen projeler
 
 FORMAT (HER fırsat için AYNEN bu yapıyı kullan):
 
@@ -701,7 +705,8 @@ KURALLAR:
 # ══════════════════════════════════════════════════════════
 
 # ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
-POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
+POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için profesyonel airdrop postları yazıyorsun.
+HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak, Markdown (*,_,`) kullanma.
 
 ⛔ KESİN YASAKLAR:
 1. Analizde OLMAYAN rakam, kod, URL yazma
@@ -709,44 +714,49 @@ POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postlar
 3. Hashtag (#) yasak
 4. Şablon metnini ("yoksa sil" gibi) posta bırakma
 5. Link için sadece: [🔗 TIKLA 🖊]
-6. Türkçe | HTML: <b>kalın</b>
+6. Markdown kullanma — sadece HTML: <b>kalın</b>
 
 KISALTMA KURALLARI:
 - Ödül yoksa → "Kampanya ödülü"
 - Son tarih yoksa → o satırı komple sil
 - Adım yoksa → o adımı komple sil
 
-AYNEN bu yapıyı kullan:
+AYNEN bu yapıyı kullan (HTML formatında):
 
-🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
+🏆 <b>[PLATFORM ADI] Yeni Üye Airdrop 🎉</b>
 
-[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
+🥇 <b><u>[PLATFORM ADI] Yeni Üyeler için [ÖDÜL MİKTARI]</u></b>
+bonus kazanma fırsatı 🤔
 
-—————————————————
-💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
-🤑 [ödül miktarı]
+——————————————————
+🗒 <b>YAPMAN GEREKENLER:</b>
 
-—————————————————
-🎯 <b>YAPMAN GEREKENLER:</b>
+①  Bağlantıya tıkla  kayıt ol ve hesabını doğrula (KYC)
+②  [adım 2]
+③  [adım 3]
+④  [adım 4 — yoksa sil]
 
-🥇 [adım 1]
-🥈 [adım 2]
-🥉 [adım 3]
-🏅 [adım 4 — yoksa sil]
+➡ Hemen Kaydol: <a href="[🔗 TIKLA 🖊]">🔗 TIKLA 🔗</a>
 
-🗓 Son gün [son tarih — yoksa bu satırı sil]
+➡ Etkinlik sayfası: <a href="[🔗 TIKLA 🖊]">🔗 TIKLA 🔗</a>
 
-—————————————————
-➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+——————————————————
+Görev zorluğu: [Kolay/Orta/Zor]
+Ödül miktarı:  <b><u>[rakam]</u></b>
+Airdrop puanı: ⭐ ⭐ ⭐ ⭐ ⭐
 
-<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
-<b>Ödül miktarı:</b> [rakam]
-<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+——————————————————
+📅 <b><u>Son gün [tarih — yoksa bu satırı sil]</u></b>
+<b>NOT:</b> [varsa önemli not, yoksa sil]
 
-—————————————————
-🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
+——————————————————
+🔥 Daha fazla airdrop için duyuru kanalını pinle 🎉
+
 📢 @kriptodropduyuru
-🎁 @kriptodroptr"""
+🎁 @kriptodroptr
+
+——————————————————
+Skor: 🟢 <b>GÜVENİLİR</b> ([skor]/100)"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
 POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
@@ -774,15 +784,19 @@ FORMAT:
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
+    from datetime import datetime
     return (
-        f"Platform/Proje: {project_name}\n\n"
+        f"Platform/Proje: {project_name}\n"
+        f"Bugünün tarihi: {datetime.now().strftime('%d.%m.%Y')}\n\n"
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
         f"=== KESİN KURALLAR ===\n"
         f"1. SADECE yukarıdaki analizde AÇIKÇA geçen rakamları kullan\n"
         f"2. Referral kodu, promo kodu, davet kodu YAZMA — analizde varsa bile\n"
         f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
         f"4. Adımları analizden al, kendin adım uydurma\n"
-        f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma"
+        f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma\n"
+        f"6. Kampanya tarihi bugünden önce ise postu YAZMA, sadece 'KAMPANYA SONA ERMİŞ' yaz\n"
+        f"7. HTML formatı kullan, Markdown kullanma"
     )
 
 
@@ -790,11 +804,11 @@ def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
     """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
+        return ai(POST_SYSTEM_SHORT, prompt, tokens=600, temp=0.3)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
+        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=250, temp=0.3)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
+        return ai(POST_SYSTEM, prompt, tokens=1400, temp=0.3)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -838,19 +852,25 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
+# ── Premium Custom Emoji ID'leri (Telegram Premium) ──────────────────────────
+# Telegram Premium paketlerinden gerçek emoji ID'leri
 # HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 CE = {
-    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
-    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
-    "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
-    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
-    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
-    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
-    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
-    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
-    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
-    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
+    "fire":     "<tg-emoji emoji-id=\"5199885118214255386\">🔥</tg-emoji>",
+    "diamond":  "<tg-emoji emoji-id=\"5471952986970267163\">💎</tg-emoji>",
+    "rocket":   "<tg-emoji emoji-id=\"5359085254097315024\">🚀</tg-emoji>",
+    "star":     "<tg-emoji emoji-id=\"5447644880824181073\">⭐</tg-emoji>",
+    "money":    "<tg-emoji emoji-id=\"5372981976804415999\">💰</tg-emoji>",
+    "warn":     "<tg-emoji emoji-id=\"5467654876416978621\">⚡</tg-emoji>",
+    "check":    "<tg-emoji emoji-id=\"5436040291507899402\">✅</tg-emoji>",
+    "gift":     "<tg-emoji emoji-id=\"5445284980978621387\">🎁</tg-emoji>",
+    "crown":    "<tg-emoji emoji-id=\"5471952986970267163\">👑</tg-emoji>",
+    "chart":    "<tg-emoji emoji-id=\"5431815452437257407\">📈</tg-emoji>",
+    "trophy":   "<tg-emoji emoji-id=\"5359085254097315024\">🏆</tg-emoji>",
+    "bell":     "<tg-emoji emoji-id=\"5407025283456817749\">🔔</tg-emoji>",
+    "pin":      "<tg-emoji emoji-id=\"5416114559863567478\">📌</tg-emoji>",
+    "tada":     "<tg-emoji emoji-id=\"5445284980978621387\">🎉</tg-emoji>",
+    "gem":      "<tg-emoji emoji-id=\"5471952986970267163\">💠</tg-emoji>",
 }
 
 def html_escape(text: str) -> str:
@@ -1190,6 +1210,8 @@ async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, wit
         return
 
     platform = context.user_data.get("last_post_platform", "cryptocurrency airdrop")
+    # Post metnini HTML olarak doğrudan kullan (safe_md çağırma)
+    send_text = post if len(post) <= 4096 else post[:4090] + "..."
 
     try:
         if with_photo:
@@ -1199,30 +1221,39 @@ async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, wit
                 await context.bot.send_photo(
                     chat_id=GROUP_CHAT_ID,
                     photo=img_url,
-                    caption=safe_md(caption),
+                    caption=caption,
                     parse_mode=ParseMode.HTML,
                 )
             else:
                 await context.bot.send_message(
                     chat_id=GROUP_CHAT_ID,
-                    text=safe_md(post),
+                    text=send_text,
                     parse_mode=ParseMode.HTML,
                 )
         else:
             await context.bot.send_message(
                 chat_id=GROUP_CHAT_ID,
-                text=safe_md(post),
+                text=send_text,
                 parse_mode=ParseMode.HTML,
             )
 
-        confirm = "✅ *Post gruba gönderildi!*" + (" 🖼️ (görsel ile)" if with_photo else "")
+        confirm = "✅ <b>Post gruba gönderildi!</b>" + (" 🖼️ (görsel ile)" if with_photo else "")
         target = update.callback_query.message if update.callback_query else update.message
         await target.reply_text(confirm, parse_mode=ParseMode.HTML, reply_markup=main_menu())
 
     except Exception as e:
         logger.error(f"Gönderme hatası: {e}")
         target = update.callback_query.message if update.callback_query else update.message
-        await target.reply_text(f"❌ Gönderim hatası: `{e}`", parse_mode=ParseMode.HTML)
+        # HTML parse hatası durumunda düz metin olarak tekrar dene
+        try:
+            await context.bot.send_message(
+                chat_id=GROUP_CHAT_ID,
+                text=re.sub(r'<[^>]+>', '', send_text),
+            )
+            target2 = update.callback_query.message if update.callback_query else update.message
+            await target2.reply_text("⚠️ HTML hatası — düz metin olarak gönderildi.", reply_markup=main_menu())
+        except Exception as e2:
+            await target.reply_text(f"❌ Gönderim hatası: <code>{e}</code>", parse_mode=ParseMode.HTML)
 
 # ══════════════════════════════════════════════════════════
 #  CALLBACK BUTONLAR
