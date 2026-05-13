@@ -336,19 +336,37 @@ def admin_only_callback(func):
 # ══════════════════════════════════════════════════════════
 #  GROQ — AI ÜRETME
 # ══════════════════════════════════════════════════════════
+_GROQ_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama3-70b-8192",
+    "llama-3.1-8b-instant",
+    "gemma2-9b-it",
+]
+
 def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75) -> str:
-    try:
-        r = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "system", "content": system},
-                      {"role": "user",   "content": user}],
-            max_tokens=tokens,
-            temperature=temp,
-        )
-        return r.choices[0].message.content.strip()
-    except Exception as e:
-        logger.error(f"Groq hata: {e}")
-        return "❌ AI yanıt üretemedi."
+    last_err = None
+    for model in _GROQ_MODELS:
+        try:
+            r = groq_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": system},
+                          {"role": "user",   "content": user}],
+                max_tokens=tokens,
+                temperature=temp,
+            )
+            return r.choices[0].message.content.strip()
+        except Exception as e:
+            last_err = e
+            err_str = str(e).lower()
+            # Kota/rate limit hatası → bir sonraki modeli dene
+            if any(k in err_str for k in ("rate_limit", "quota", "429", "503", "overloaded", "capacity")):
+                logger.warning(f"Groq model {model} kullanılamıyor, sonraki deneniyor: {e}")
+                continue
+            # Başka hata türü (auth, bad request vb.) → direkt çık
+            logger.error(f"Groq hata ({model}): {e}")
+            return "❌ AI yanıt üretemedi."
+    logger.error(f"Tüm Groq modelleri başarısız: {last_err}")
+    return "❌ AI yanıt üretemedi (tüm modeller denemendi)."
 
 # ══════════════════════════════════════════════════════════
 #  TAVILY — DERIN ARAMA
@@ -894,26 +912,7 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji ID'leri (Telegram Premium) ──────────────────────────
-# Telegram Premium paketlerinden gerçek emoji ID'leri
-# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
-CE = {
-    "fire":     "<tg-emoji emoji-id=\"5199885118214255386\">🔥</tg-emoji>",
-    "diamond":  "<tg-emoji emoji-id=\"5471952986970267163\">💎</tg-emoji>",
-    "rocket":   "<tg-emoji emoji-id=\"5359085254097315024\">🚀</tg-emoji>",
-    "star":     "<tg-emoji emoji-id=\"5447644880824181073\">⭐</tg-emoji>",
-    "money":    "<tg-emoji emoji-id=\"5372981976804415999\">💰</tg-emoji>",
-    "warn":     "<tg-emoji emoji-id=\"5467654876416978621\">⚡</tg-emoji>",
-    "check":    "<tg-emoji emoji-id=\"5436040291507899402\">✅</tg-emoji>",
-    "gift":     "<tg-emoji emoji-id=\"5445284980978621387\">🎁</tg-emoji>",
-    "crown":    "<tg-emoji emoji-id=\"5471952986970267163\">👑</tg-emoji>",
-    "chart":    "<tg-emoji emoji-id=\"5431815452437257407\">📈</tg-emoji>",
-    "trophy":   "<tg-emoji emoji-id=\"5359085254097315024\">🏆</tg-emoji>",
-    "bell":     "<tg-emoji emoji-id=\"5407025283456817749\">🔔</tg-emoji>",
-    "pin":      "<tg-emoji emoji-id=\"5416114559863567478\">📌</tg-emoji>",
-    "tada":     "<tg-emoji emoji-id=\"5445284980978621387\">🎉</tg-emoji>",
-    "gem":      "<tg-emoji emoji-id=\"5471952986970267163\">💠</tg-emoji>",
-}
+# CE dict yukarıda (satır ~278) tanımlandı, burada tekrar tanımlanmıyor.
 
 def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
@@ -935,9 +934,6 @@ def md_to_html(text: str) -> str:
     text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
     # Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
-    # tg-emoji placeholder'larını geri yükle
-    for key, val in placeholders.items():
-        text = text.replace(key, val)
     return text.strip()
 
 def safe_md(text: str) -> str:
@@ -1164,13 +1160,13 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # 1. Araştır
     if is_url(input_text):
         await msg.edit_text("🔗 <b>URL içeriği çekiliyor...</b>", parse_mode=ParseMode.HTML)
-        data = research_airdrop_by_url(input_text)
+        data = await asyncio.to_thread(research_airdrop_by_url, input_text)
     else:
         await msg.edit_text(
             f"🔍 <b>\'{input_text}\' araştırılıyor...</b>\n<i>Çoklu sorgu çalışıyor...</i>",
             parse_mode=ParseMode.HTML,
         )
-        data = research_airdrop_by_name(input_text)
+        data = await asyncio.to_thread(research_airdrop_by_name, input_text)
 
     project_name = data.get("name", input_text)
 
@@ -1179,7 +1175,7 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         "🔁 <b>Çoklu kaynak doğrulanıyor...</b>\n<i>Güvenilirlik skoru hesaplanıyor...</i>",
         parse_mode=ParseMode.HTML,
     )
-    score_data = verify_and_score(project_name, data)
+    score_data = await asyncio.to_thread(verify_and_score, project_name, data)
     score      = score_data.get("score", 50)
     verdict    = score_data.get("verdict", "BELİRSİZ")
     reasons    = score_data.get("reasons", [])
@@ -1195,12 +1191,12 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Doğrulama verisini de analize ekle
     enriched_data = data.copy()
     enriched_data["raw"] = data.get("raw","") + "\n\n=== DOĞRULAMA ===\n" + score_data.get("extra_raw","")
-    analysis = analyze_research(enriched_data)
+    analysis = await asyncio.to_thread(analyze_research, enriched_data)
     context.user_data["last_analysis"] = analysis
 
     # 4. Post oluştur (gerçek skoru geç)
     await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
-    post = build_post(analysis, project_name, score=score, verdict=verdict)
+    post = await asyncio.to_thread(build_post, analysis, project_name, "long", score, verdict)
     context.user_data["last_post"]          = post
     context.user_data["final_post"]         = post
     context.user_data["last_post_platform"] = project_name
