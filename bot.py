@@ -272,6 +272,32 @@ def format_score_badge(score: int, verdict: str) -> str:
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 
+# ── Premium Custom Emoji ID'leri (Telegram Premium paketleri) ─────────────────
+# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
+# Bot'un Premium aboneliği varsa animasyonlu görünür, yoksa fallback emoji görünür
+CE = {
+    "fire":    "<tg-emoji emoji-id=\"5199885118214255386\">🔥</tg-emoji>",
+    "diamond": "<tg-emoji emoji-id=\"5471952986970267163\">💎</tg-emoji>",
+    "rocket":  "<tg-emoji emoji-id=\"5359085254097315024\">🚀</tg-emoji>",
+    "star":    "<tg-emoji emoji-id=\"5447644880824181073\">⭐</tg-emoji>",
+    "money":   "<tg-emoji emoji-id=\"5372981976804415999\">💰</tg-emoji>",
+    "warn":    "<tg-emoji emoji-id=\"5467654876416978621\">⚡</tg-emoji>",
+    "check":   "<tg-emoji emoji-id=\"5436040291507899402\">✅</tg-emoji>",
+    "gift":    "<tg-emoji emoji-id=\"5445284980978621387\">🎁</tg-emoji>",
+    "crown":   "<tg-emoji emoji-id=\"5471952986970267163\">👑</tg-emoji>",
+    "chart":   "<tg-emoji emoji-id=\"5431815452437257407\">📈</tg-emoji>",
+    "trophy":  "<tg-emoji emoji-id=\"5359085254097315024\">🏆</tg-emoji>",
+    "bell":    "<tg-emoji emoji-id=\"5407025283456817749\">🔔</tg-emoji>",
+    "pin":     "<tg-emoji emoji-id=\"5416114559863567478\">📌</tg-emoji>",
+    "tada":    "<tg-emoji emoji-id=\"5445284980978621387\">🎉</tg-emoji>",
+    "gem":     "<tg-emoji emoji-id=\"5471952986970267163\">💠</tg-emoji>",
+    "medal1":  "<tg-emoji emoji-id=\"5359085254097315024\">🥇</tg-emoji>",
+    "note":    "<tg-emoji emoji-id=\"5416114559863567478\">🗒</tg-emoji>",
+    "cal":     "<tg-emoji emoji-id=\"5407025283456817749\">📅</tg-emoji>",
+    "mega":    "<tg-emoji emoji-id=\"5416114559863567478\">📢</tg-emoji>",
+    "arrow":   "<tg-emoji emoji-id=\"5436040291507899402\">➡️</tg-emoji>",
+}
+
 # ══════════════════════════════════════════════════════════
 #  ADMIN GUARD
 # ══════════════════════════════════════════════════════════
@@ -704,8 +730,10 @@ KURALLAR:
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
-POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için profesyonel airdrop postları yazıyorsun.
+# ── POST_SYSTEM: Premium emoji'li şablon ────────────────────────────────────
+def get_post_system() -> str:
+    """POST şablonunu Telegram Premium emojileriyle döndür."""
+    return f"""Sen KriptoDropTR Telegram kanalı için profesyonel airdrop postları yazıyorsun.
 HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak, Markdown (*,_,`) kullanma.
 
 ⛔ KESİN YASAKLAR:
@@ -715,72 +743,74 @@ HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak, Markdown (*,_,`) ku
 4. Şablon metnini ("yoksa sil" gibi) posta bırakma
 5. Link için sadece: [🔗 TIKLA 🖊]
 6. Markdown kullanma — sadece HTML: <b>kalın</b>
+7. Son satır olarak ASLA skor ekleme — skor ayrıca eklenecek
 
 KISALTMA KURALLARI:
 - Ödül yoksa → "Kampanya ödülü"
 - Son tarih yoksa → o satırı komple sil
 - Adım yoksa → o adımı komple sil
 
-AYNEN bu yapıyı kullan (HTML formatında):
+AYNEN bu yapıyı kullan (tg-emoji taglarını olduğu gibi koru):
 
-🏆 <b>[PLATFORM ADI] Yeni Üye Airdrop 🎉</b>
+{CE['trophy']} <b>[PLATFORM ADI] Yeni Üye Airdrop {CE['tada']}</b>
 
-🥇 <b><u>[PLATFORM ADI] Yeni Üyeler için [ÖDÜL MİKTARI]</u></b>
+{CE['medal1']} <b><u>[PLATFORM ADI] Yeni Üyeler için [ÖDÜL MİKTARI]</u></b>
 bonus kazanma fırsatı 🤔
 
 ——————————————————
-🗒 <b>YAPMAN GEREKENLER:</b>
+{CE['note']} <b>YAPMAN GEREKENLER:</b>
 
-①  Bağlantıya tıkla  kayıt ol ve hesabını doğrula (KYC)
+①  Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)
 ②  [adım 2]
 ③  [adım 3]
 ④  [adım 4 — yoksa sil]
 
-➡ Hemen Kaydol: <a href="[🔗 TIKLA 🖊]">🔗 TIKLA 🔗</a>
+{CE['arrow']} Hemen Kaydol: 🔗 [🔗 TIKLA 🖊] 🔗
 
-➡ Etkinlik sayfası: <a href="[🔗 TIKLA 🖊]">🔗 TIKLA 🔗</a>
+{CE['arrow']} Etkinlik sayfası: 🔗 [🔗 TIKLA 🖊] 🔗
 
 ——————————————————
 Görev zorluğu: [Kolay/Orta/Zor]
 Ödül miktarı:  <b><u>[rakam]</u></b>
-Airdrop puanı: ⭐ ⭐ ⭐ ⭐ ⭐
+Airdrop puanı: {CE['star']} {CE['star']} {CE['star']} {CE['star']} {CE['star']}
 
 ——————————————————
-📅 <b><u>Son gün [tarih — yoksa bu satırı sil]</u></b>
+{CE['cal']} <b><u>Son gün [tarih — yoksa bu satırı sil]</u></b>
 <b>NOT:</b> [varsa önemli not, yoksa sil]
 
 ——————————————————
-🔥 Daha fazla airdrop için duyuru kanalını pinle 🎉
+{CE['fire']} Daha fazla airdrop için duyuru kanalını pinle {CE['tada']}
 
-📢 @kriptodropduyuru
-🎁 @kriptodroptr
+{CE['mega']} @kriptodropduyuru
+{CE['gift']} @kriptodroptr"""
 
-——————————————————
-Skor: 🟢 <b>GÜVENİLİR</b> ([skor]/100)"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
+def get_post_system_short() -> str:
+    return f"""KriptoDropTR için kısa airdrop postu yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
-✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 400 karakter | Türkçe
 
 YAPI:
-🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
+{CE['rocket']} <b>[PLATFORM] — [BAŞLIK]!</b>
 
-🤑 <b>Ödül:</b> [rakam]
-🥇 [adım 1]
-🥈 [adım 2]
+{CE['money']} <b>Ödül:</b> [rakam]
+① [adım 1]
+② [adım 2]
 
-➡️ [🔗 TIKLA 🖊]
-📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
+{CE['arrow']} [🔗 TIKLA 🖊]
+{CE['mega']} @kriptodropduyuru | {CE['gift']} @kriptodroptr"""
+
 
 # ── Özet format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
+def get_post_system_summary() -> str:
+    return f"""KriptoDropTR için 2-3 satır airdrop özeti yaz.
 ⛔ Uydurma rakam, referral kodu, hashtag yasak.
 HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
 
 FORMAT:
-🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
-📢 @kriptodropduyuru 🎁 @kriptodroptr"""
+{CE['rocket']} <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. {CE['arrow']} [🔗 TIKLA 🖊]
+{CE['mega']} @kriptodropduyuru {CE['gift']} @kriptodroptr"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -796,19 +826,31 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"4. Adımları analizden al, kendin adım uydurma\n"
         f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma\n"
         f"6. Kampanya tarihi bugünden önce ise postu YAZMA, sadece 'KAMPANYA SONA ERMİŞ' yaz\n"
-        f"7. HTML formatı kullan, Markdown kullanma"
+        f"7. tg-emoji HTML taglarını (örn: <tg-emoji emoji-id=...>) aynen koru, silme"
     )
 
 
-def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
-    """fmt: 'long' | 'short' | 'summary'"""
+def build_post(analysis: str, project_name: str, fmt: str = "long", score: int = None, verdict: str = None) -> str:
+    """fmt: 'long' | 'short' | 'summary'. Skor programatik olarak eklenir."""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        return ai(POST_SYSTEM_SHORT, prompt, tokens=600, temp=0.3)
+        raw = ai(get_post_system_short(), prompt, tokens=600, temp=0.3)
     elif fmt == "summary":
-        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=250, temp=0.3)
+        raw = ai(get_post_system_summary(), prompt, tokens=250, temp=0.3)
     else:
-        return ai(POST_SYSTEM, prompt, tokens=1400, temp=0.3)
+        raw = ai(get_post_system(), prompt, tokens=1400, temp=0.3)
+
+    # Skoru programatik olarak ekle (AI yerine gerçek skoru kullan)
+    if fmt == "long" and score is not None:
+        verdict_str = verdict or "GÜVENİLİR"
+        if score >= 75:
+            dot = "🟢"
+        elif score >= 50:
+            dot = "🟡"
+        else:
+            dot = "🔴"
+        raw = raw.rstrip() + f"\n\n——————————————————\nSkor: {dot} <b>{verdict_str}</b> ({score}/100)"
+    return raw
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -893,6 +935,9 @@ def md_to_html(text: str) -> str:
     text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
     # Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
+    # tg-emoji placeholder'larını geri yükle
+    for key, val in placeholders.items():
+        text = text.replace(key, val)
     return text.strip()
 
 def safe_md(text: str) -> str:
@@ -1153,9 +1198,9 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     analysis = analyze_research(enriched_data)
     context.user_data["last_analysis"] = analysis
 
-    # 4. Post oluştur
+    # 4. Post oluştur (gerçek skoru geç)
     await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
-    post = build_post(analysis, project_name)
+    post = build_post(analysis, project_name, score=score, verdict=verdict)
     context.user_data["last_post"]          = post
     context.user_data["final_post"]         = post
     context.user_data["last_post_platform"] = project_name
