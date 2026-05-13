@@ -201,78 +201,50 @@ def check_deadlines() -> list:
 
 def verify_and_score(name: str, initial_data: dict) -> dict:
     """
-    Aynı projeyi 4 farklı kaynaktan daha ara, çapraz doğrula.
-    Güvenilirlik skoru hesapla — tarih & ödül & kaynak doğrulama dahil.
-    Genişletilmiş kriter seti ve spam/scam kontrolü.
+    Aynı projeyi 2 farklı kaynaktan daha ara, çapraz doğrula.
+    Güvenilirlik skoru hesapla.
     """
-    now_tr    = _now_tr()
-    now_label = _now_label()
-
-    # ── 4 Katmanlı Doğrulama Sorguları ───────────────────────────────────
+    # İkinci tur arama — farklı sorgular
     extra_queries = [
-        f"{name} legit scam review reddit {now_label}",
-        f"{name} official website social media verified {now_label}",
-        f"{name} airdrop aktif mi bitti mi {now_label}",
-        f"{name} scam alert fraud warning crypto {now_label}",
+        f"{name} legit scam review reddit 2026",
+        f"{name} official website social media verified",
     ]
     extra_results = []
     for q in extra_queries:
-        extra_results.extend(deep_search(q, max_results=4, advanced=True))
-
-    # Deduplicate
-    seen_urls = set()
-    unique_extra = []
-    for r in extra_results:
-        url = r.get("url", "")
-        if url and url not in seen_urls:
-            seen_urls.add(url)
-            unique_extra.append(r)
+        extra_results.extend(deep_search(q, max_results=3))
 
     extra_text = "\n\n".join([
-        f"[DOĞRULAMA {i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:800]}"
-        for i, r in enumerate(unique_extra[:10])
+        f"[DOĞRULAMA {i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:600]}"
+        for i, r in enumerate(extra_results[:6])
     ])
 
     combined_raw = initial_data.get("raw","") + "\n\n=== ÇAPRAZ DOĞRULAMA SONUÇLARI ===\n" + extra_text
 
-    total_sources = len(initial_data.get("sources", [])) + len(unique_extra)
-
-    score_system = f"""Sen bir kripto fırsat doğrulama uzmanısın.
+    score_system = """Sen bir kripto fırsat doğrulama uzmanısın.
 Verilen ham veriyi analiz ederek GÜVENİLİRLİK SKORU hesapla.
 
-🛑 BUGÜNÜN TARİHİ: {now_tr}
-
 SKOR KRİTERLERİ (0-100):
-+25: Resmi web sitesi veya doğrulanmış sosyal medya hesabı bulundu
-+20: Bilinen borsa/proje (Binance, OKX, Bybit, CoinTR, BtcTurk, Arbitrum vb.)
-+15: 3+ bağımsız kaynakta aynı bilgi doğrulandı
-+15: Net ödül miktarı kaynakta AÇIKÇA yazıyor ve doğrulanabilir
-+15: Kampanya son tarihi {now_tr} SONRA → AKTİF
-+10: Reddit/Twitter'da pozitif topluluk yorumları var
-+5:  Proje audit raporuna sahip veya bilinen bir kurum tarafından destekleniyor
--15: Yalnızca 1 kaynak bulunan bilinmez proje
--20: "Scam", "fraud", "fake", "rug" kelimesi geçiyor
--25: Kaynak bulunamadı veya çok az bilgi var (< 3 kaynak)
--40: Son tarihi {now_tr} ÖNCE → SONA ERMİŞ (bu kampanya listelenemez!)
--20: Ödül rakamı kaynakta yok, sadece tahmin/belirsiz
--15: Sosyal medya hesabı yeni veya şüpheli (düşük takipçi, sahte görünüm)
--10: Aşırı yüksek ödül vaat eden (gerçek dışı miktarlar)
++20: Resmi web sitesi veya sosyal medya bulundu
++20: Bilinen borsa/proje (Binance, OKX, Bybit, Arbitrum vb.)
++15: Birden fazla bağımsız kaynakta aynı bilgi
++15: Net ödül miktarı ve son tarih belirtilmiş
++10: Reddit/Twitter'da pozitif yorumlar var
+-20: Yalnızca 1 kaynak bulunan bilinmez proje
+-25: "Scam", "fraud", "fake" kelimesi geçiyor
+-30: Kaynak bulunamadı veya çok az bilgi var
+-20: Son tarihi geçmiş kampanya
 
 ÇIKTI FORMAT (kesinlikle bu JSON yapısında):
-{{
+{
   "score": 75,
-  "verdict": "GÜVENİLİR / ŞÜPHELİ / RİSKLİ / SONA ERMİŞ",
-  "expired": false,
+  "verdict": "GÜVENİLİR / ŞÜPHELİ / RİSKLİ",
   "reasons": ["neden 1", "neden 2", "neden 3"],
-  "warning": "varsa uyarı metni, yoksa boş string",
-  "confirmed_reward": "kaynakta doğrulanan ödül miktarı — yoksa boş string",
-  "confirmed_deadline": "kaynakta doğrulanan son tarih — yoksa boş string",
-  "source_count": {total_sources}
-}}
+  "warning": "varsa uyarı metni, yoksa boş string"
+}
 
 SADECE JSON döndür, başka hiçbir şey yazma."""
 
-    result_str = ai(score_system, f"Proje: {name}\n\n{combined_raw[:6000]}", tokens=600, temp=0.1)
+    result_str = ai(score_system, f"Proje: {name}\n\n{combined_raw[:5000]}", tokens=400, temp=0.1)
 
     # JSON parse
     try:
@@ -281,12 +253,11 @@ SADECE JSON döndür, başka hiçbir şey yazma."""
         if json_match:
             score_data = json.loads(json_match.group())
         else:
-            score_data = {"score": 50, "verdict": "BELİRSİZ", "expired": False, "reasons": [], "warning": "", "confirmed_reward": "", "confirmed_deadline": "", "source_count": total_sources}
+            score_data = {"score": 50, "verdict": "BELİRSİZ", "reasons": [], "warning": ""}
     except Exception:
-        score_data = {"score": 50, "verdict": "BELİRSİZ", "expired": False, "reasons": [], "warning": "", "confirmed_reward": "", "confirmed_deadline": "", "source_count": total_sources}
+        score_data = {"score": 50, "verdict": "BELİRSİZ", "reasons": [], "warning": ""}
 
     score_data["extra_raw"] = extra_text
-    score_data["source_count"] = total_sources
     return score_data
 
 def format_score_badge(score: int, verdict: str) -> str:
@@ -363,20 +334,6 @@ AIRDROP_DOMAINS = [
     "blockworks.co", "twitter.com", "x.com", "medium.com", "mirror.xyz"
 ]
 
-# ── Dinamik tarih yardımcısı ──────────────────────────────────────────────
-def _now_label() -> str:
-    """Arama sorgularına eklenecek dinamik AY YILI etiketi: 'April 2026'"""
-    return datetime.now().strftime("%B %Y")
-
-def _now_tr() -> str:
-    """Güncel tarih Türkçe tam formatta: '12 Nisan 2026'"""
-    months_tr = {
-        1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan", 5: "Mayıs", 6: "Haziran",
-        7: "Temmuz", 8: "Ağustos", 9: "Eylül", 10: "Ekim", 11: "Kasım", 12: "Aralık"
-    }
-    now = datetime.now()
-    return f"{now.day} {months_tr[now.month]} {now.year}"
-
 def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
     """
     Gerçek DuckDuckGo arama — duckduckgo_search kütüphanesi.
@@ -413,38 +370,21 @@ def _httpx_scrape(url: str) -> str:
 # Tavily kota durumunu takip et
 _tavily_quota_ok = True
 
-def deep_search(query: str, max_results: int = 5, advanced: bool = False) -> list[dict]:
+def deep_search(query: str, max_results: int = 5) -> list[dict]:
     """
-    Önce Tavily dene (advanced mode destekli), kota dolmuşsa DuckDuckGo'ya geç.
-    advanced=True → Tavily search_depth="advanced" (daha derin, daha güncel sonuçlar)
+    Önce Tavily dene, kota dolmuşsa DuckDuckGo'ya geç.
+    DDG: API key yok, tamamen ücretsiz, gerçek sonuçlar.
     """
     global _tavily_quota_ok
     if _tavily_quota_ok:
         try:
-            depth = "advanced" if advanced else "basic"
             r = tavily_client.search(
                 query=query,
-                search_depth=depth,
+                search_depth="basic",
                 max_results=max_results,
                 include_answer=False,
-                # Güncel sonuçları ön plana çıkar
-                include_raw_content=False,
             )
-            results = r.get("results", [])
-            # Eski sonuçları filtrele: URL'de veya başlıkta geçen yıldan eski yıl varsa ağırlık düşür
-            current_year = str(datetime.now().year)
-            prev_year    = str(datetime.now().year - 1)
-            two_yrs_ago  = str(datetime.now().year - 2)
-            filtered = []
-            for item in results:
-                title   = (item.get("title") or "").lower()
-                content = (item.get("content") or "").lower()
-                # 2 yıl öncesine ait içeriği at
-                if two_yrs_ago in title or two_yrs_ago in content:
-                    logger.debug(f"Eski sonuç atlandı: {item.get('url','')}")
-                    continue
-                filtered.append(item)
-            return filtered if filtered else results  # Hepsi eskiyse orijinali döndür
+            return r.get("results", [])
         except Exception as e:
             err_str = str(e)
             if "432" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
@@ -452,6 +392,7 @@ def deep_search(query: str, max_results: int = 5, advanced: bool = False) -> lis
                 _tavily_quota_ok = False
             else:
                 logger.error(f"Tavily hata: {e}")
+                # Tavily başka hata verdiyse DDG'yi dene
                 return _ddg_search(query, max_results)
     return _ddg_search(query, max_results)
 
@@ -500,78 +441,56 @@ def get_image(query: str = "cryptocurrency airdrop") -> str | None:
 
 def research_airdrop_by_name(name: str) -> dict:
     """
-    Platform/proje adına göre çok katmanlı derin araştırma.
-    7 sorgu kategorisi × 5 sonuç = ~35 ham sonuç → deduplicate → en iyi 3 tam sayfa.
+    Platform/proje adına göre araştırma.
+    Tavily: 3 sorgu × 4 sonuç = 12 istek (eski: 5×5=25)
     """
-    now_label = _now_label()   # örn: "April 2026"
-    now_tr    = _now_tr()      # örn: "12 Nisan 2026"
-
-    # ── 7 Katmanlı Sorgu Dizisi ──────────────────────────────────────────
+    # Sadece en etkili 3 sorgu — kredi tasarrufu
     queries = [
-        # 1. Resmi duyurular (Twitter/X, Medium, blog)
-        f"{name} official announcement airdrop campaign {now_label} site:twitter.com OR site:x.com OR site:medium.com OR site:blog.*",
-        # 2. Kampanya detayları (miktar, süre, koşullar)
-        f"{name} airdrop campaign reward amount how to claim tasks eligibility {now_label} active",
-        # 3. Borsa yeni kullanıcı bonusu
-        f"{name} new user bonus welcome reward sign up deposit USDT TL {now_label}",
-        # 4. Türkçe kaynaklar
-        f"{name} kripto kampanya kayıt bonusu nasıl alınır ödül miktarı adımlar {now_label}",
-        # 5. Topluluk yorumları (Reddit, forum)
-        f"{name} airdrop review legit scam reddit {now_label}",
-        # 6. Bitiş tarihi / deadline
-        f"{name} airdrop campaign deadline end date expiry {now_label}",
-        # 7. Resmi web sitesi / döküman
-        f"{name} official website docs tokenomics airdrop page {now_label}",
+        f"{name} new user bonus reward how to claim 2026",
+        f"{name} airdrop tasks eligibility reward amount 2026",
+        f"{name} kripto kampanya kayıt bonusu nasıl alınır",
     ]
-
     all_results = []
     for q in queries:
-        hits = deep_search(q, max_results=5, advanced=True)
+        hits = deep_search(q, max_results=4)
         all_results.extend(hits)
+        if len(all_results) >= 10:
+            break  # Yeterli sonuç varsa devam etme
 
-    # ── Deduplicate ──────────────────────────────────────────────────────
+    # Tekrar edenleri filtrele
     seen_urls = set()
     unique = []
     for item in all_results:
         url = item.get("url", "")
-        if url and url not in seen_urls:
+        if url not in seen_urls:
             seen_urls.add(url)
             unique.append(item)
 
-    # ── Ham metin birleştirme (en fazla 15 kaynak) ───────────────────────
     raw_text = "\n\n".join([
-        f"[KAYNAK {i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:1500]}"
-        for i, r in enumerate(unique[:15])
+        f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:1200]}"
+        for i, r in enumerate(unique[:8])
     ])
 
-    # ── En iyi 3 sayfanın tam içeriğini çek ──────────────────────────────
-    full_pages = []
-    for page in unique[:3]:
-        page_url = page.get("url", "")
+    # En alakalı sayfanın içeriğini çek (1 kredi)
+    if unique:
+        best_url = unique[0].get("url", "")
         try:
-            full = fetch_url_content(page_url)
-            if full and len(full) > 200:
-                full_pages.append(f"=== TAM SAYFA ({page_url}) ===\n{full[:3000]}")
+            full = fetch_url_content(best_url)
+            if full:
+                raw_text = f"=== TAM SAYFA ({best_url}) ===\n{full[:2500]}\n\n=== DİĞER KAYNAKLAR ===\n{raw_text}"
         except Exception:
             pass
 
-    if full_pages:
-        full_section = "\n\n".join(full_pages)
-        raw_text = f"{full_section}\n\n=== DİĞER KAYNAKLAR ===\n{raw_text}"
-
-    logger.info(f"Araştırma tamamlandı: '{name}' → {len(unique)} benzersiz kaynak, {len(full_pages)} tam sayfa")
-    return {"name": name, "raw": raw_text, "sources": unique[:15], "source_count": len(unique)}
+    return {"name": name, "raw": raw_text, "sources": unique[:8]}
 
 
 def research_airdrop_by_url(url: str) -> dict:
     """
-    URL'ye göre çok katmanlı derin araştırma:
+    URL'ye göre derin araştırma:
     - URL içeriğini çek
-    - 4 ek sorgu ile zenginleştir (tarih-duyarlı)
-    - Resmi sosyal medya + topluluk doğrulaması
+    - Ek arama sorgularıyla zenginleştir
     """
     content = fetch_url_content(url)
-    now_label = _now_label()
 
     # İçerikten proje adı çıkar (AI ile)
     name_hint = ai(
@@ -580,161 +499,80 @@ def research_airdrop_by_url(url: str) -> dict:
         tokens=50, temp=0.1
     )
 
-    # ── 4 Katmanlı Ek Araştırma ─────────────────────────────────────────
-    extra_queries = [
-        # 1. Kampanya detayları
-        f"{name_hint} airdrop claim guide tasks reward amount {now_label} active",
-        # 2. Resmi duyurular
-        f"{name_hint} official announcement {now_label} site:twitter.com OR site:medium.com OR site:discord.com",
-        # 3. Topluluk yorumları
-        f"{name_hint} airdrop legit review reddit community {now_label}",
-        # 4. Bitiş tarihi
-        f"{name_hint} campaign deadline end date expiry {now_label}",
-    ]
-    all_extra = []
-    for q in extra_queries:
-        hits = deep_search(q, max_results=5, advanced=True)
-        all_extra.extend(hits)
-
-    # Deduplicate
-    seen_urls = set()
-    unique_extra = []
-    for item in all_extra:
-        item_url = item.get("url", "")
-        if item_url and item_url not in seen_urls:
-            seen_urls.add(item_url)
-            unique_extra.append(item)
-
+    extra = deep_search(f"{name_hint} airdrop claim guide tasks 2025", max_results=6)
     extra_text = "\n\n".join([
-        f"[EK KAYNAK {i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:800]}"
-        for i, r in enumerate(unique_extra[:12])
+        f"[{i+1}] {r.get('title','')}\nURL: {r.get('url','')}\n{r.get('content','')[:400]}"
+        for i, r in enumerate(extra[:6])
     ])
 
-    # En iyi 2 ek sayfanın tam içeriğini çek
-    extra_full = []
-    for page in unique_extra[:2]:
-        page_url = page.get("url", "")
-        try:
-            full = fetch_url_content(page_url)
-            if full and len(full) > 200:
-                extra_full.append(f"=== EK TAM SAYFA ({page_url}) ===\n{full[:2500]}")
-        except Exception:
-            pass
-
-    extra_full_text = "\n\n".join(extra_full) if extra_full else ""
-
-    raw = f"=== ANA SAYFA İÇERİĞİ ===\n{content}\n\n{extra_full_text}\n\n=== EK KAYNAKLAR ===\n{extra_text}"
-    logger.info(f"URL araştırma tamamlandı: '{name_hint.strip()}' → {len(unique_extra)} ek kaynak")
-    return {"name": name_hint.strip(), "raw": raw, "sources": unique_extra[:12], "url": url, "source_count": len(unique_extra)}
+    raw = f"=== SAYFA İÇERİĞİ ===\n{content}\n\n=== EK KAYNAKLAR ===\n{extra_text}"
+    return {"name": name_hint.strip(), "raw": raw, "sources": extra[:6], "url": url}
 
 
 def analyze_research(data: dict) -> str:
-    """AI ile araştırma verisini analiz et — yapılandırılmış format, sadece belgeli bilgiler. Tarih doğrulamalı."""
-    now_tr   = _now_tr()     # örn: "12 Nisan 2026"
-    now_year = str(datetime.now().year)
-    source_count = data.get("source_count", len(data.get("sources", [])))
+    """AI ile araştırma verisini analiz et — sadece belgeli bilgileri yaz."""
+    system = """Sen deneyimli bir kripto kazanım fırsatı araştırmacısısın.
+Görevin: HAM VERİDEN SADECE gerçek, belgeli bilgileri çıkarmak.
 
-    system = f"""Sen deneyimli bir kripto kazanım fırsatı araştırmacısısın.
-Görevin: HAM VERİDEN SADECE gerçek, belgeli bilgileri çıkarmak ve YAPILANDIRILMIŞ formatta sunmak.
+KRITIK KURALLAR:
+1. SADECE ham veride geçen bilgileri yaz — asla tahmin/uydurma yapma
+2. Rakamlar ve tarihler KAYNAK metinden kopyalanacak
+3. Ham veride yoksa: "Bulunamadı" yaz
+4. Kampanya tarihi eskiyse "SONA ERMİŞ OLABİLİR" ekle
+5. Kaynak URL-lerini mutlaka yaz
 
-🛑 BUGÜNÜN TARİHİ: {now_tr}
-Bu tarihten önceki kampanyalar SONA ERMİŞ sayılır.
-
-KRİTİK KURALLAR:
-1. SADECE ham veride açıkça geçen bilgileri yaz — asla tahmin/uydurma yapma
-2. ÖDÜL RAKAMI: yalnızca kaynak metinden kopyala. Kaynak metinde yoksa "Belirtilmemiş" yaz.
-   ❌ Asla tahmin etme, "genellikle", "yaklaşık" gibi ifade kullanma
-   ❌ Abartılı rakamlara dikkat: kaynakta görünmüyorsa yazma
-3. Tarihler KAYNAK metinden birebir kopyalanacak
-4. Ham veride yoksa: "Bulunamadı" yaz
-5. Son tarihi {now_tr} öncesinde olan kampanyanın başına «❌ SONA ERMİŞ» yaz
-6. Son tarihi belirtilmemiş kampanyaya: "Son tarih belirsiz — güncelliği doğrulanamadı" ekle
-7. Kaynak URL-lerini mutlaka yaz
-8. Adımları kısa ve net yaz — her adım 1 cümle
-
-FORMAT (HER ALANI DOLDUR — bilgi yoksa "Bulunamadı" yaz):
-
-📌 PLATFORM/PROJE: [adı — ne olduğu (borsa/DeFi/L2/GameFi vb.)]
-🏷 FIRSATIN TÜRÜ: [borsa bonusu / airdrop / kampanya / referral / testnet / retroactive / node / learn / nft]
-💰 ÖDÜL MİKTARI: [kaynaktaki EXACT rakam — yoksa: Belirtilmemiş]
-💼 PROJE YATIRIMI (FUND): [Projenin topladığı yatırım miktarı - yoksa: Belirtilmemiş]
-🐦 TWITTER (X) TAKİPÇİ: [Takipçi sayısı - yoksa: Belirtilmemiş]
-   📎 KAYNAK: [Bilginin alındığı URL]
-👥 KİMLER KATILABİLİR: [yeni kullanıcı / mevcut kullanıcı / herkes]
-🌍 ÜLKE KISITI: [Varsa yaz — yoksa: Kısıtlama belirtilmemiş]
-📋 ADIMLAR (kaynaktan al — uydurma):
-  1. [adım — kısa ve net]
-  2. [adım]
-  3. [adım varsa]
-  4. [adım varsa]
-💎 MİNİMUM GEREKSİNİM: [min yatırım/işlem varsa — yoksa: Yok]
-⏰ KAMPANYA DÖNEMİ: [Başlangıç tarihi — Bitiş tarihi — kaynaktan kopyala]
-📊 DURUM: [✅ AKTİF / ❌ SONA ERMİŞ / ⚠️ BELİRSİZ — gerekçe yaz]
+FORMAT:
+📌 PLATFORM/PROJE: [adı ve ne olduğu]
+🏷 FIRSATIN TÜRÜ: [borsa bonusu / airdrop / kampanya / referral]
+💰 ÖDÜL MİKTARI: [kaynaktaki EXACT rakam]
+👥 KİMLER KATILABİLİR: [yeni kullanıcı / mevcut / herkes]
+📋 ADIMLAR:
+  1. [kaynak metindeki adım] — [ödül miktarı]
+  2. [kaynak metindeki adım] — [ödül miktarı]
+  3. devam...
+💎 TOPLAM: [varsa]
+⏰ SON TARİH: [varsa — yoksa Belirtilmemiş]
 🔗 KATILIM LİNKİ: [kaynaktaki URL]
-⭐ GÜVENİLİRLİK: [1-5 yıldız + kısa neden]
-⚠️ UYARILAR: [KYC gerekli mi / min yatırım / ülke kısıtı / risk bilgisi]
-📰 KAYNAKLAR: {source_count} kaynak tarandı — ana kaynaklar:
-  - [Kaynak 1 URL]
-  - [Kaynak 2 URL]
-  - [Kaynak 3 URL]
+⭐ GÜVENİLİRLİK: [1-5 yıldız + neden]
+⚠️ UYARI: [KYC / min yatırım / ülke kısıtı / SONA ERMİŞ OLABİLİR]
 
-ZORUNLU KURALLAR:
-- Türkçe yaz
-- Uydurma YAPMA
-- Her alan doldurulacak — bilgi yoksa "Bulunamadı/Belirtilmemiş" yaz
-- Tarih kontrolünü mutlaka yap: {now_tr} öncesindeki kampanyalar SONA ERMİŞ
-- Adımları kısa tut — her adım en fazla 1-2 cümle"""
+Türkçe yaz. Uydurma YAPMA."""
 
-    return ai(system, f"Proje: {data['name']}\n\n{data['raw'][:10000]}", tokens=1200)
+    return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2000)
 
 
 # ── Fırsat kategorileri ve arama sorguları ──────────────────────────────
-# ── Fırsat arama sorguları (dinamik tarihli) ──────────────────────────────
-def _build_opportunity_queries() -> list[tuple[str, str]]:
-    """Her çağrıda güncel ay+yıl ile sorgu listesini oluştur."""
-    m = _now_label()   # örn: "April 2026"
-    y = str(datetime.now().year)
-    return [
-        # Borsa yeni kullanıcı bonusu — güncel + Türkçe borsalar dahil
-        ("bonus", f"kripto borsa yeni üye kampanyası kayıt ödülü {m} USDT TL aktif"),
-        ("bonus", f"crypto exchange new user bonus welcome reward USDT {m} site:binance.com OR site:bybit.com OR site:okx.com OR site:cointr.com"),
-        # Referral / davet kampanyası
-        ("referral", f"crypto referral program earn USDT invite friends commission {m} active"),
-        # İşlem / trading kampanyası
-        ("kampanya", f"crypto exchange trading competition reward prize USDT {m}"),
-        # Telegram / sosyal görev ödülü
-        ("sosyal", f"telegram crypto bot task reward earn token USDT {m}"),
-        # Klasik kolay airdrop — güncel ay
-        ("airdrop", f"crypto airdrop claim {m} active free no investment required"),
-        # Testnet
-        ("testnet", f"crypto incentivized testnet airdrop guide {m} active"),
-        # Retroactive
-        ("retroactive", f"crypto retroactive airdrop snapshot not taken {m}"),
-        # Node / Validator
-        ("node", f"crypto run node validator incentivized testnet reward {m}"),
-        # Learn & Earn
-        ("learn", f"crypto learn and earn quiz answers free token {m}"),
-        # NFT / Whitelist
-        ("nft", f"crypto free NFT mint whitelist giveaway {m} active"),
-    ]
-
-# Geriye dönük uyumluluk için sabit liste (dinamik fonksiyon çağrılmazsa)
-OPPORTUNITY_QUERIES = _build_opportunity_queries()
+# ── Fırsat arama sorguları ─────────────────────────────────────────────
+# Borsa kayıt bonusu + kampanya ağırlıklı, airdrop destekli
+OPPORTUNITY_QUERIES = [
+    # Borsa yeni kullanıcı bonusu — Türkçe borsalar dahil
+    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü 2026 USDT TL Mart aktif"),
+    ("bonus", "crypto exchange new user bonus welcome reward USDT 2025 site:binance.com OR site:bybit.com OR site:okx.com OR site:cointr.com OR site:bitlo.com"),
+    ("bonus", "crypto exchange sign up reward deposit bonus free USDT 2026"),
+    ("bonus", "borsa kayıt kampanyası hediye 2025 site:cointr.com OR site:paribu.com OR site:btcturk.com"),
+    # Referral / davet kampanyası
+    ("referral", "crypto referral program earn USDT invite friends commission 2025 2026"),
+    ("referral", "kripto borsa arkadaş davet et kazan referral ödülü 2025"),
+    # İşlem / trading kampanyası
+    ("kampanya", "crypto exchange trading competition reward prize USDT 2025 2026"),
+    ("kampanya", "kripto borsa işlem kampanyası ödül havuzu 2025"),
+    # Telegram / sosyal görev ödülü
+    ("sosyal", "telegram crypto bot task reward earn token USDT 2025"),
+    ("sosyal", "crypto project telegram task reward points 2025 airdrop"),
+    # Klasik kolay airdrop
+    ("airdrop", "crypto airdrop claim March 2026 active free no investment required"),
+    ("airdrop", "galxe zealy intract quest airdrop reward March 2026 active"),
+]
 
 
 # Kategori tanımları — kullanıcıya gösterilen label ve filtre key'i
 CATEGORY_DEFS = {
-    "hepsi":       ("🌐 Hepsi",          None),           # filtre yok
-    "bonus":       ("🎁 Borsa Bonusu",   ["bonus"]),
-    "referral":    ("👥 Referral",       ["referral"]),
-    "kampanya":    ("🏆 Kampanya",       ["kampanya"]),
-    "sosyal":      ("📱 Sosyal Görev",   ["sosyal"]),
-    "airdrop":     ("🪂 Airdrop",        ["airdrop"]),
-    "testnet":     ("🛠 Testnet",        ["testnet"]),
-    "retroactive": ("🔙 Retroactive",    ["retroactive"]),
-    "node":        ("🖥 Node/Validator", ["node"]),
-    "learn":       ("📚 Öğren Kazan",    ["learn"]),
-    "nft":         ("🖼 NFT/Whitelist",  ["nft"]),
+    "hepsi":    ("🌐 Hepsi",          None),           # filtre yok
+    "bonus":    ("🎁 Borsa Bonusu",   ["bonus"]),
+    "referral": ("👥 Referral",       ["referral"]),
+    "kampanya": ("🏆 Kampanya",       ["kampanya"]),
+    "sosyal":   ("📱 Sosyal Görev",   ["sosyal"]),
+    "airdrop":  ("🪂 Airdrop",        ["airdrop"]),
 }
 
 
@@ -755,21 +593,19 @@ def category_filter_menu() -> InlineKeyboardMarkup:
 def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
     """
     Tavily araması — cats verilirse sadece o kategorileri tara.
-    Her kategoriden en iyi 2 sorgu kullan (daha geniş kapsam).
-    Dinamik tarih ile her çalışmada güncel sorgular oluşturulur.
+    Her kategoriden en iyi 1 sorgu kullan (kredi tasarrufu).
     """
-    live_queries = _build_opportunity_queries()  # Anlık tarihli sorgular
     seen_urls  = set()
     results    = []
-    cat_count  = {}   # Her kategoriden max 2 sorgu
-    for category, query in live_queries:
+    # Kategori başına sadece EN İYİ 1 sorgu çalıştır
+    seen_cats  = set()
+    for category, query in OPPORTUNITY_QUERIES:
         if cats and category not in cats:
             continue
-        cat_count.setdefault(category, 0)
-        if cat_count[category] >= 2:
-            continue  # Her kategoriden max 2 sorgu
-        cat_count[category] += 1
-        hits = deep_search(query, max_results=6, advanced=True)
+        if category in seen_cats:
+            continue  # Her kategoriden tek sorgu
+        seen_cats.add(category)
+        hits = deep_search(query, max_results=4)
         for r in hits:
             url = r.get("url", "")
             if url in seen_urls:
@@ -779,21 +615,18 @@ def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
                 "category": category,
                 "title":    r.get("title", ""),
                 "url":      url,
-                "content":  r.get("content", "")[:1500],
+                "content":  r.get("content", "")[:1200],
             })
-        if len(results) >= 30:
-            break  # Yeterli sonuç var
-    logger.info(f"Fırsat taraması: {len(results)} benzersiz sonuç, {len(cat_count)} kategori")
+        if len(results) >= 20:
+            break  # Yeterli sonuç var, devam etme
     return results
 
 
 def scan_active_airdrops(cats: list[str] | None = None) -> str:
     """
-    Gelişmiş kripto kazanım fırsatı tarayıcısı — tarih-duyarlı, çok kaynaklı.
+    Kripto kazanım fırsatı tarayıcısı.
     cats=None → tüm kategoriler
     """
-    now_tr    = _now_tr()     # örn: "12 Nisan 2026"
-    now_label = _now_label()  # örn: "April 2026"
     raw_results = run_opportunity_search(cats=cats)
 
     if not raw_results:
@@ -806,34 +639,25 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
         by_cat.setdefault(cat, []).append(r)
 
     cat_labels = {
-        "bonus":       "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
-        "referral":    "👥 REFERRAL / DAVET KAMPANYASI",
-        "kampanya":    "🏆 İŞLEM / TRADİNG KAMPANYASI",
-        "sosyal":      "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
-        "airdrop":     "🪂 AIRDROP",
-        "testnet":     "🛠 TESTNET GÖREVLERİ",
-        "retroactive": "🔙 RETROACTIVE AIRDROP",
-        "node":        "🖥 NODE / VALIDATOR KURULUMU",
-        "learn":       "📚 ÖĞREN KAZAN",
-        "nft":         "🖼 ÜCRETSİZ NFT MİNT / WHITELIST",
+        "bonus":    "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
+        "referral": "👥 REFERRAL / DAVET KAMPANYASI",
+        "kampanya": "🏆 İŞLEM / TRADİNG KAMPANYASI",
+        "sosyal":   "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
+        "airdrop":  "🪂 AIRDROP",
     }
 
-    combined_raw = f"BUGÜNÜN TARİHİ: {now_tr}\nARAMA DÖNEMİ: {now_label}\nTOPLAM SONUÇ: {len(raw_results)}\n"
+    combined_raw = ""
     for cat, items in by_cat.items():
         label = cat_labels.get(cat, cat.upper())
-        sep = "━" * 25
+        sep = "=" * 40
         combined_raw += f"\n\n{sep}\n{label}\n{sep}\n"
-        for item in items[:4]:   # Her kategoriden 4 sonuç
+        for item in items[:3]:
             t = item["title"]
             u = item["url"]
             c = item["content"]
             combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
-
-    system = f"""Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
+    system = """Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
 Amacın: Sıradan bir kullanıcının GERÇEKTEN para kazanabileceği, somut rakamlı, BUGÜN AKTİF fırsatları bulmak.
-
-🛑 BUGÜNÜN TARİHİ: {now_tr}
-Bu tarihten önce biten kampanyaları KESİNLİKLE listeye alma!
 
 ÖNCELİK SIRASI:
 1. 🎁 Borsa kayıt bonusu — yeni üye ol, az emekle somut TL/USDT kazan
@@ -845,163 +669,108 @@ Bu tarihten önce biten kampanyaları KESİNLİKLE listeye alma!
 KESİN REDDET (listeye ekleme):
 ❌ Validator/node çalıştırma gerektiren
 ❌ 1000$+ yatırım zorunlu olanlar
-❌ {now_tr} tarihinden önce biten kampanyalar
+❌ Tarihi geçmiş kampanyalar (2024 ve öncesi)
+❌ Rakamı belirsiz/eksik fırsatlar
 ❌ Sadece "yakında" diyip tarih vermeyen projeler
-❌ Ödül rakamı kaynakta geçmiyorsa ASLA uydurma — "Belirtilmemiş" yaz
 
-FORMAT (HER fırsat için BİREBİR bu yapıyı kullan):
+FORMAT (HER fırsat için AYNEN bu yapıyı kullan):
 
-━━━━━━━━━━━━━━━━━━━
-🚀 [BORSA/PLATFORM ADI]
-┣ 💰 Ödül: [EXACT rakam — kaynakta yoksa: Belirtilmemiş]
-┣ 🏷 Tür: [borsa bonusu / airdrop / referral / görev]
+━━━━━━━━━━━━━━━━━━━━━━
+🎁 [BORSA/PLATFORM ADI]
+┣ 💰 Ödül: [EXACT rakam — örn: 2600 TL / 50 USDT / 100 TOKEN]
+┣ 🏦 Tür: [borsa bonusu / airdrop / referral / görev]
 ┣ 👥 Kimler: [yeni kullanıcı / mevcut / herkes]
 ┣ 📋 Adımlar:
-┃  ①  [adım — kısa]
-┃  ②  [adım — kısa]
-┃  ③  [adım — kısa]
-┣ 📅 Kampanya: [tarih aralığı / devam ediyor / belirsiz]
+┃  1️⃣ [adım] → [ödül]
+┃  2️⃣ [adım] → [ödül]
+┃  3️⃣ [adım] → [ödül]
+┣ ⏰ Son Tarih: [tarih / süre / devam ediyor]
 ┣ ⭐ Güvenilirlik: [⭐⭐⭐⭐⭐]
 ┗ 🔗 [kayıt/katılım URL]
 
 KURALLAR:
-- Somut rakam varsa yaz: "50 USDT", "2600 TL", "500 TOKEN"
-- Kaynakta YOK ise: "Ödül: Belirtilmemiş" yaz, uydurma
-- Adım numaraları: ① ② ③ ④ ⑤ — başka format YASAK
-- 4-8 kaliteli ve AKTİF fırsat listele
-- Türkçe yaz, net ve anlaşılır ol
-- Her fırsat arasında ━━━━━━━━━━━━━━━━━━━ (19 adet ━) ayırıcı kullan"""
+- Somut rakam yaz: "50 USDT", "2600 TL", "500 TOKEN"
+- Kaynak veride olmayan rakamı YAZMA
+- 4-6 kaliteli fırsat listele, gereksiz olanları atla
+- Türkçe yaz, net ve anlaşılır ol"""
 
-    return ai(system, combined_raw[:10000], tokens=4000)
+    return ai(system, combined_raw[:8000], tokens=3500)
 
-# ── POST TASARIMI ────────────────────────────────────────────────────────────
-POST_FOOTER = """
-__________________________________
-__________________________________
+# ══════════════════════════════════════════════════════════
+#  POST OLUŞTURMA
+# ══════════════════════════════════════════════════════════
 
-🔥 Daha fazla airdrop için duyuru kanalını pinle
+# ── POST_SYSTEM: Hedef format — görsel, bölümlü, kanal linkli ────────────────
+POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için airdrop/fırsat postları yazıyorsun.
+
+⛔ KESİN YASAKLAR:
+1. Analizde OLMAYAN rakam, kod, URL yazma
+2. Referral/promo kodu ASLA yazma
+3. Hashtag (#) yasak
+4. Şablon metnini ("yoksa sil" gibi) posta bırakma
+5. Link için sadece: [🔗 TIKLA 🖊]
+6. Türkçe | HTML: <b>kalın</b>
+
+KISALTMA KURALLARI:
+- Ödül yoksa → "Kampanya ödülü"
+- Son tarih yoksa → o satırı komple sil
+- Adım yoksa → o adımı komple sil
+
+AYNEN bu yapıyı kullan:
+
+🚀 <b>[PLATFORM ADI] [FIRSATI KISA ANLATAN BAŞLIK]!</b> 🎁
+
+[Tek cümle açıklama — örn: "Görevleri tamamla, ödül kazan 🔥"]
+
+—————————————————
+💸 <b>KAZANABİLECEĞİN ÖDÜLLER:</b>
+🤑 [ödül miktarı]
+
+—————————————————
+🎯 <b>YAPMAN GEREKENLER:</b>
+
+🥇 [adım 1]
+🥈 [adım 2]
+🥉 [adım 3]
+🏅 [adım 4 — yoksa sil]
+
+🗓 Son gün [son tarih — yoksa bu satırı sil]
+
+—————————————————
+➡️ Hemen katıl:  🖊 [🔗 TIKLA 🖊] 🖊
+
+<b>Görev zorluğu:</b> [Kolay/Orta/Zor]
+<b>Ödül miktarı:</b> [rakam]
+<b>Airdrop puanı:</b> [⭐ sayısı — güvenilirliğe göre 1-5]
+
+—————————————————
+🔥 Daha fazla airdrop için duyuru kanalını pinle 📣
 📢 @kriptodropduyuru
-🎁 @kriptodroptr
-__________________________________
-"""
-
-POST_SYSTEM = """Sen KriptoDropTR Telegram kanalı için Türkçe airdrop/fırsat postları hazırlıyorsun.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-KESİN UYULACAK TASARIM KURALLARI:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⛔ YASAK (kesinlikle yapma):
-- Referral kodu, promo kodu yazma
-- Uydurma/tahmin rakamı yazma (kaynakta AÇIKÇA geçmeyen ödül)
-- Hashtag (#) kullanma
-- Uzun paragraf blokları oluşturma — açıklamalar KISA olacak
-- HTML tag kullanma
-- Ayırıcı çizgileri değiştirme
-
-✅ BİREBİR UYULACAK ŞABLON:
-
-🚀 [Platform Adı] [kısa başlık]! 🎁
-
-[1-2 KISA cümle — ödülü ve fırsatı net anlat] 🤑
-
-__________________________________
-🔥 YAPMAN GEREKENLER:
-
-① [Adım 1 — kaynak metinden, kısa ve net]
-② [Adım 2 — kaynak metinden, kısa ve net]
-③ [Adım 3 — varsa, yoksa bu satırı SİL]
-④ [Adım 4 — yalnızca varsa, yoksa SİL]
-
-__________________________________
-»» Hemen Kaydol: 🔗 [🔗 TIKLA ↗]🔗
-»» Etkinlik Sayfası: 🔗 [🔗 TIKLA ↗]🔗  ← yalnızca ayrı link varsa ekle, yoksa SİL
-
-Görev zorluğu: [Kolay / Orta / Zor]
-Ödül miktarı: [Kaynaktaki EXACT rakam — yoksa: Belirtilmemiş]
-Airdrop puanı: [⭐ sayısı skora göre: ⭐⭐⭐⭐⭐]
-
-📆 Kampanya Dönemi: [Tarih aralığı — kaynaktan kopyala — yoksa: Belirtilmemiş]
-__________________________________
-
-KRİTİK KURALLAR:
-1. Adım numaraları MUTLAKA ① ② ③ ④ ⑤ daireli unicode kullan — başka format YASAK
-2. Ayırıcı çizgileri tam olarak 34 alt çizgi karakteriyle "__________________________________" kullan
-3. Link satırı: »» [İsim]: 🔗 [🔗 TIKLA ↗]🔗 — bu formatı koru, URL yazma
-4. Ödül rakamı kaynakta yoksa: "Belirtilmemiş" yaz, ASLA uydurma
-5. Tüm bölümler arasında 1 boş satır bırak
-6. Başlıkta 🚀 ... 🎁 emojileri MUTLAKA kullan
-7. Özet cümlesi 🤑 ile bitecek
-8. "YAPMAN GEREKENLER" başlığı 🔥 ile başlayacak
-9. Adım açıklamaları KISA — her adım EN FAZLA 1-2 kısa cümle
-10. Kampanya dönemi 📆 emojisi ile başlayacak
-11. Görev zorluğu, Ödül miktarı, Airdrop puanı — her biri ayrı satır, KISA
-12. Türkçe yaz — İngilizce kelime mümkünse kullanma
-13. Hat [🔗 TIKLA ↗] bırak — link placeholder kaldırılmayacak
-
-ÖRNEK ÇIKTI (birebir bu formata uy):
-
-🚀 BitMart Büyük Harcama Kampanyası! 🎁
-
-520 USDT bonus kazanma fırsatı sunuyor 🤑
-
-__________________________________
-🔥 YAPMAN GEREKENLER:
-
-① BitMart'a kayıt olun
-② Büyük harcama yapın
-
-__________________________________
-»» Hemen Kaydol: 🔗 [🔗 TIKLA ↗]🔗
-»» Etkinlik Sayfası: 🔗 [🔗 TIKLA ↗]🔗
-
-Görev zorluğu: Kolay
-Ödül miktarı: 520 USDT
-Airdrop puanı: ⭐⭐⭐⭐
-
-📆 Kampanya Dönemi: Son tarih belirsiz — güncelliği doğrulanamadı
-__________________________________
-"""
+🎁 @kriptodroptr"""
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SHORT = """KriptoDropTR için KISA airdrop postu yaz.
-⛔ Uydurma rakam, referral kodu, hashtag YASAK.
-✅ BİREBİR bu şablona uy — başka format YASAK:
+POST_SYSTEM_SHORT = """KriptoDropTR için kısa airdrop postu yaz.
+⛔ Uydurma rakam, referral kodu, hashtag yasak.
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 350 karakter | Türkçe
 
-🚀 [PLATFORM] [BAŞLIK]! 🎁
+YAPI:
+🚀 <b>[PLATFORM] — [BAŞLIK]!</b>
 
-[1 kısa cümle özet] 🤑
+🤑 <b>Ödül:</b> [rakam]
+🥇 [adım 1]
+🥈 [adım 2]
 
-__________________________________
-🔥 YAPMAN GEREKENLER:
-
-① [adım 1 — kısa]
-② [adım 2 — kısa]
-③ [adım 3 — varsa]
-
-__________________________________
-»» Kaydol: 🔗 [🔗 TIKLA ↗]🔗
-
-Ödül: [kaynaktaki rakam — yoksa Belirtilmemiş]
-Airdrop puanı: [⭐⭐⭐⭐⭐]
-
-📆 Kampanya Dönemi: [Tarih — yoksa Belirtilmemiş]
-__________________________________
-
-KURALLAR: Adımlar ① ② ③ | Ayırıcı __________________________________ (34 alt çizgi) | Maks 400 karakter | Türkçe"""
+➡️ [🔗 TIKLA 🖊]
+📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 # ── Özet format ───────────────────────────────────────────────────────────────
-POST_SYSTEM_SUMMARY = """KriptoDropTR için 3-4 satır airdrop ÖZET postu yaz.
-⛔ Uydurma rakam, referral kodu, hashtag YASAK.
-✅ BİREBİR bu şablona uy:
+POST_SYSTEM_SUMMARY = """KriptoDropTR için 2-3 satır airdrop özeti yaz.
+⛔ Uydurma rakam, referral kodu, hashtag yasak.
+HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
 
-🚀 [PLATFORM] — [ödül varsa yaz, yoksa 'aktif kampanya'] kazan! 🎁
-__________________________________
-① [en önemli adım]
-② [ikinci adım]
-__________________________________
-»» Kaydol: 🔗 [🔗 TIKLA ↗]🔗
-📆 [Tarih — yoksa Belirtilmemiş]"""
+FORMAT:
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
+📢 @kriptodropduyuru 🎁 @kriptodroptr"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -1012,56 +781,20 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"1. SADECE yukarıdaki analizde AÇIKÇA geçen rakamları kullan\n"
         f"2. Referral kodu, promo kodu, davet kodu YAZMA — analizde varsa bile\n"
         f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
-        f"4. Adım numaraları: ① ② ③ ④ ⑤ — başka format kullanma\n"
-        f"5. Adımları analizden al, kendin adım uydurma — her adım KISA (1-2 cümle)\n"
-        f"6. Ödül miktarı analizde geçmiyorsa 'Belirtilmemiş' yaz, uydurma\n"
-        f"7. Analizde 'SONA ERMİŞ' veya 'geçmiş tarih' yazıyorsa post üretme — sadece uyarı yaz\n"
-        f"8. [🔗 TIKLA ↗] placeholder'ını KORU — URL yazma, değiştirme\n"
-        f"9. Link satırı formatı: »» [İsim]: 🔗 [🔗 TIKLA ↗]🔗\n"
-        f"10. Ayırıcı çizgileri tam olarak: __________________________________ kullan.\n"
-        f"11. Başlık emojileri: 🚀 ... 🎁 — MUTLAKA kullan\n"
-        f"12. Açıklamalar ORTA KISALIKTA — 1-2 cümle, detaylı ama kısa\n"
-        f"13. Kampanya dönemi 📆 ile başlasın\n"
-        f"14. Görev zorluğunu belirle (Kolay / Orta / Zor).\n"
-        f"15. Airdrop puanını analizdeki güvenilirlik yıldızıyla eşleştir"
+        f"4. Adımları analizden al, kendin adım uydurma\n"
+        f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma"
     )
 
 
-def build_post(analysis: str, project_name: str, fmt: str = "long", score_data: dict = None) -> str:
-    """
-    fmt: 'long' | 'short' | 'summary'
-    score_data: verify_and_score'dan gelen dict (opsiyonel — skor postun altına eklenir)
-    """
-    # Sona ermiş kampanya kontrolü — post üretme
-    expired_indicators = ["SONA ERMİŞ", "sona ermiş", "expired", "EXPIRED"]
-    if any(ind in analysis for ind in expired_indicators):
-        return (
-            f"⚠️ {project_name} kampanyası SONA ERMİŞ görünüyor.\n"
-            f"Analiz: sona ermiş tarih tespit edildi — post üretilmedi.\n"
-            f"Farklı bir platform araştırmak için yeni araştırma başlat."
-        ) + POST_FOOTER
-
+def build_post(analysis: str, project_name: str, fmt: str = "long") -> str:
+    """fmt: 'long' | 'short' | 'summary'"""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        content = ai(POST_SYSTEM_SHORT, prompt, tokens=600, temp=0.25)
+        return ai(POST_SYSTEM_SHORT, prompt, tokens=500, temp=0.3)
     elif fmt == "summary":
-        content = ai(POST_SYSTEM_SUMMARY, prompt, tokens=300, temp=0.25)
+        return ai(POST_SYSTEM_SUMMARY, prompt, tokens=200, temp=0.3)
     else:
-        content = ai(POST_SYSTEM, prompt, tokens=1800, temp=0.25)
-
-    # ── Güvenilirlik Skoru Ekleme ── (post gövdesine gömülü)
-    score_line = ""
-    if score_data:
-        score = score_data.get("score", 50)
-        verdict = score_data.get("verdict", "BELİRSİZ")
-        badge = format_score_badge(score, verdict)
-        source_count = score_data.get("source_count", 0)
-        score_line = f"\nSkor: {badge}"
-        if source_count:
-            score_line += f"\n📊 {source_count} kaynak tarandı"
-
-    # SABİT FOOTER + SKOR EKLE
-    return content + POST_FOOTER + score_line
+        return ai(POST_SYSTEM, prompt, tokens=1200, temp=0.3)
 
 # ══════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -1105,93 +838,41 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
 async def typing(update: Update):
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-# ── Premium Custom Emoji Map (Verified Unique IDs) ───────────────────────────
-# HTML mode: <tg-emoji emoji-id="ID">fallback</tg-emoji>
-# Post şablonunda kullanılan TÜM emojiler burada tanımlı olmalıdır.
+# ── Premium Custom Emoji ID'leri (Telegram built-in) ─────────────────────────
+# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 CE = {
-    # ── Ana Post Emojileri ────────────────────────────────────────────────
-    "🚀": "5368324170671202286",  # Roket — başlık
-    "🔥": "5431321415494215242",  # Ateş — YAPMAN GEREKENLER + footer
-    "🎁": "5431411586529035136",  # Hediye — başlık + footer
-    "💰": "5431321415490021396",  # Para — ödül
-    "🤑": "5431411586533229598",  # Para ağızlı — özet sonu
-    "⭐": "5431627943585579051",  # Yıldız — airdrop puanı
-    "🔗": "5431627943572996118",  # Link — kayıt linki
-    "📅": "5431627943589773312",  # Takvim — kampanya dönemi
-    "📆": "5431627943589773312",  # Takvim alternatif
-    "📢": "5431627943594002447",  # Duyuru — footer kanal
-    "✅": "5431321415515187219",  # Onay — durum/aktif
-    "💎": "5431411586512257041",  # Elmas — premium
-    "↗": "5431627943572996118",   # Yönlendirme (Link ok)
-    # ── Analiz/Rapor Emojileri ────────────────────────────────────────────
-    "📊": "5431627943585579050",  # Grafik — güvenilirlik raporu
-    "📡": "5431627943581384725",  # Anten — kaynak sayısı
-    "🔍": "5431627943572996117",  # Büyüteç — araştırma
-    "🔬": "5431627943594002447",  # Mikroskop — derin araştırma
-    "📋": "5431627943589773312",  # Pano — adımlar
-    "🏷": "5431627943572996118",  # Etiket — tür
-    "👥": "5431627943581384725",  # İnsanlar — kimler katılabilir
-    "🎯": "5431411586529035136",  # Hedef — görev
-    # ── Ek Emojiler ──────────────────────────────────────────────────────
-    "⚡️": "5431627943585579051", # Şimşek (Varyasyonlu)
-    "⚡": "5431627943585579051",  # Şimşek
-    "🥇": "5431627943581384725",  # 1. (Altın)
-    "🥈": "5431627943585579050",  # 2.
-    "🥉": "5431627943572996117",  # 3.
-    "📍": "5431627943589773312",  # Konum/Nokta
-    "🔹": "5431627943572996118",  # Mavi parlayan
-    "📌": "5431627943589773312",  # Raptiye — takip
-    "🟢": "5431321415515187219",  # Yeşil daire — güvenilir
-    "🟡": "5431627943585579051",  # Sarı daire — şüpheli
-    "🔴": "5431321415494215242",  # Kırmızı daire — riskli
+    "fire":     "<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji>",
+    "diamond":  "<tg-emoji emoji-id=\"5386367538735104399\">💎</tg-emoji>",
+    "rocket":   "<tg-emoji emoji-id=\"5368324170671202286\">🚀</tg-emoji>",
+    "star":     "<tg-emoji emoji-id=\"5368324170671202286\">⭐</tg-emoji>",
+    "money":    "<tg-emoji emoji-id=\"5368324170671202286\">💰</tg-emoji>",
+    "warn":     "<tg-emoji emoji-id=\"5386367538735104399\">⚡</tg-emoji>",
+    "check":    "<tg-emoji emoji-id=\"5368324170671202286\">✅</tg-emoji>",
+    "gift":     "<tg-emoji emoji-id=\"5386367538735104399\">🎁</tg-emoji>",
+    "crown":    "<tg-emoji emoji-id=\"5368324170671202286\">👑</tg-emoji>",
+    "chart":    "<tg-emoji emoji-id=\"5386367538735104399\">📈</tg-emoji>",
 }
-
-def apply_custom_emojis(text: str) -> str:
-    """Metindeki standart emojileri Premium animasyonlu versiyonlarıyla değiştir."""
-    import re
-    # ⛔ GÜVENLİK: Eğer metin zaten <tg-emoji> içeriyorsa veya çok karmaşıksa hata almamak için 
-    # placeholder yöntemi kullanıyoruz.
-    
-    # Değiştirilecek emojileri listele
-    sorted_emojis = sorted(CE.keys(), key=len, reverse=True)
-    
-    # 1. Mevcut HTML etiketlerini ve linkleri korumaya al (placeholder)
-    placeholders = []
-    def to_placeholder(match):
-        placeholders.append(match.group(0))
-        return f"__PH{len(placeholders)-1}__"
-    
-    # Etiketleri koru
-    text = re.sub(r'<[^>]+>', to_placeholder, text)
-    
-    # 2. Sadece düz metin kalan yerlerde emojileri değiştir
-    for emoji in sorted_emojis:
-        if emoji in text:
-            eid = CE[emoji]
-            # Emoji tagını placeholder olmadan direkt yerleştir (çünkü içinde başka tag yok)
-            text = text.replace(emoji, f'<tg-emoji emoji-id="{eid}">{emoji}</tg-emoji>')
-    
-    # 3. Korumaya aldığımız etiketleri geri koy
-    for i, ph_val in enumerate(placeholders):
-        text = text.replace(f"__PH{i}__", ph_val)
-        
-    return text
 
 def html_escape(text: str) -> str:
     """HTML özel karakterlerini kaçır."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def md_to_html(text: str) -> str:
-    """Metni Telegram HTML formatına çevirir (Sıfır Hata Garantili)."""
+    """AI'nin ürettiği Markdown benzeri metni Telegram HTML'e çevir."""
     import re
-    if not text: return ""
-    
-    # 1. Kaçış işlemleri
-    text = html_escape(text)
-    
-    # 2. Kalınlıkları çevir (** -> <b>)
+    # Hashtag temizle
+    text = re.sub(r'(?m)^#+\s.*$', "", text)
+    text = re.sub(r'#\w+', "", text)
+    # **bold** → <b>bold</b>
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-    
+    # *bold* → <b>bold</b>
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
+    # _italic_ → <i>italic</i>
+    text = re.sub(r'_(.+?)_', r'<i>\1</i>', text)
+    # `code` → <code>code</code>
+    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    # Birden fazla boş satırı teke indir
+    text = re.sub(r'\n{3,}', "\n\n", text)
     return text.strip()
 
 def safe_md(text: str) -> str:
@@ -1340,6 +1021,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode=ParseMode.HTML,
                     reply_markup=post_actions(has_link=True),
                 )
+        else:
+            preview = (
+                f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
+                f"Hazır! Gruba gönderebilirsin."
+            )
+            if len(preview) > 4096:
+                preview = preview[:4086] + "_"
+            await update.message.reply_text(
+                preview,
+                parse_mode=ParseMode.HTML,
+                reply_markup=post_actions(has_link=True),
+            )
         return
 
     # Post düzenleme
@@ -1398,98 +1091,51 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
 
     msg = await update.effective_message.reply_text(
         f"🔬 <b>Araştırma başladı:</b> <code>{input_text[:60]}</code>\n"
-        "━━━━━━━━━━━━━━━━━━━\n"
-        "📡 Kaynaklar taranıyor... (1/7)\n"
-        "⏳ 45-90 saniye sürebilir...",
+        "⏳ 30-60 saniye sürebilir...",
         parse_mode=ParseMode.HTML,
     )
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-    # ── 1. Derin Araştırma ──────────────────────────────────────────────
+    # 1. Araştır
     if is_url(input_text):
-        await msg.edit_text(
-            f"🔬 <b>Araştırma:</b> <code>{input_text[:50]}</code>\n"
-            "━━━━━━━━━━━━━━━━━━━\n"
-            "🔗 URL içeriği çekiliyor...\n"
-            "📡 4 ek sorgu çalışıyor...",
-            parse_mode=ParseMode.HTML,
-        )
+        await msg.edit_text("🔗 <b>URL içeriği çekiliyor...</b>", parse_mode=ParseMode.HTML)
         data = research_airdrop_by_url(input_text)
     else:
         await msg.edit_text(
-            f"🔬 <b>Araştırma:</b> <code>{input_text[:50]}</code>\n"
-            "━━━━━━━━━━━━━━━━━━━\n"
-            "🔍 7 farklı sorgu çalışıyor...\n"
-            "📡 Kaynaklar toplanıyor...",
+            f"🔍 <b>\'{input_text}\' araştırılıyor...</b>\n<i>Çoklu sorgu çalışıyor...</i>",
             parse_mode=ParseMode.HTML,
         )
         data = research_airdrop_by_name(input_text)
 
     project_name = data.get("name", input_text)
-    source_count = data.get("source_count", len(data.get("sources", [])))
 
-    # ── 2. İlerleme güncelleme ──────────────────────────────────────────
+    # 2. Çoklu kaynak doğrulama + güvenilirlik skoru
     await msg.edit_text(
-        f"🔬 <b>Araştırma:</b> <code>{project_name[:50]}</code>\n"
-        "━━━━━━━━━━━━━━━━━━━\n"
-        f"✅ {source_count} benzersiz kaynak bulundu\n"
-        "🔁 Çoklu kaynak doğrulaması başlıyor... (3/7)",
+        "🔁 <b>Çoklu kaynak doğrulanıyor...</b>\n<i>Güvenilirlik skoru hesaplanıyor...</i>",
         parse_mode=ParseMode.HTML,
     )
-    await update.effective_chat.send_action(ChatAction.TYPING)
-
-    # ── 3. Çoklu kaynak doğrulama + güvenilirlik skoru ──────────────────
     score_data = verify_and_score(project_name, data)
     score      = score_data.get("score", 50)
     verdict    = score_data.get("verdict", "BELİRSİZ")
-    expired    = score_data.get("expired", False)
     reasons    = score_data.get("reasons", [])
     warning    = score_data.get("warning", "")
     badge      = format_score_badge(score, verdict)
-    total_sources = score_data.get("source_count", source_count)
-    confirmed_reward = score_data.get("confirmed_reward", "")
-    confirmed_deadline = score_data.get("confirmed_deadline", "")
 
-    # Sona ermiş kampanya → admin'e ikaz ver
-    if expired or "SONA ERMİŞ" in verdict:
-        await update.effective_message.reply_text(
-            f"⚠️ <b>DİKKAT:</b> <code>{project_name}</code> kampanyası muhtemelen <b>SONA ERMİŞ</b>!\n"
-            "Güvenilirlik skoru düşük tutuldu. Yine de post hazırlanıyor — kontrol et.",
-            parse_mode=ParseMode.HTML,
-        )
-
+    # Çok düşük skor → uyar ama devam et
     context.user_data["last_score"]   = score_data
     context.user_data["last_project"] = project_name
 
-    # ── 4. AI analiz ────────────────────────────────────────────────────
-    await msg.edit_text(
-        f"🔬 <b>Araştırma:</b> <code>{project_name[:50]}</code>\n"
-        "━━━━━━━━━━━━━━━━━━━\n"
-        f"✅ {total_sources} kaynak doğrulandı\n"
-        f"🔒 Skor: {badge}\n"
-        "🤖 AI analizi yapılıyor... (5/7)",
-        parse_mode=ParseMode.HTML,
-    )
-
+    # 3. AI analiz
+    await msg.edit_text("🤖 <b>AI analizi yapılıyor...</b>", parse_mode=ParseMode.HTML)
     # Doğrulama verisini de analize ekle
     enriched_data = data.copy()
     enriched_data["raw"] = data.get("raw","") + "\n\n=== DOĞRULAMA ===\n" + score_data.get("extra_raw","")
-    enriched_data["source_count"] = total_sources
     analysis = analyze_research(enriched_data)
     context.user_data["last_analysis"] = analysis
 
-    # ── 5. Post oluştur ─────────────────────────────────────────────────
-    await msg.edit_text(
-        f"🔬 <b>Araştırma:</b> <code>{project_name[:50]}</code>\n"
-        "━━━━━━━━━━━━━━━━━━━\n"
-        f"✅ Analiz tamamlandı\n"
-        "✍️ Post hazırlanıyor... (6/7)",
-        parse_mode=ParseMode.HTML,
-    )
-
-    post = build_post(analysis, project_name, score_data=score_data)
-    
-    # ⛔ HAM METİN olarak kaydet — HTML dönüşümü SADECE gönderim/önizleme anında yapılacak
+    # 4. Post oluştur
+    await msg.edit_text("✍️ <b>Post yazılıyor...</b>", parse_mode=ParseMode.HTML)
+    post = build_post(analysis, project_name)
     context.user_data["last_post"]          = post
     context.user_data["final_post"]         = post
     context.user_data["last_post_platform"] = project_name
@@ -1499,57 +1145,38 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Postu arşive kaydet
     save_post_archive(project_name, post, "long")
 
-    # ── 6. Güvenilirlik raporu ──────────────────────────────────────────
+    # 5. Güvenilirlik raporunu göster
     reasons_text = "\n".join([f"  • {r}" for r in reasons]) if reasons else "  • Bilgi yetersiz"
-    
-    reward_info = f"\n💰 Doğrulanan Ödül: <code>{confirmed_reward}</code>" if confirmed_reward else ""
-    deadline_info = f"\n📅 Doğrulanan Tarih: <code>{confirmed_deadline}</code>" if confirmed_deadline else ""
-    warning_info = f"\n⚠️ Uyarı: {warning}" if warning else ""
-    
     score_msg = (
         f"📊 <b>GÜVENİLİRLİK RAPORU — {project_name.upper()}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: {badge}\n"
-        f"📡 Taranan Kaynak: {total_sources}\n"
-        f"{reward_info}{deadline_info}{warning_info}\n\n"
-        f"📋 <b>Değerlendirme:</b>\n{reasons_text}\n\n"
-        f"{'━' * 19}\n"
-        f"{analysis}\n\n"
-        f"🤖 <i>[v3.0 — Gelişmiş Araştırma]</i>"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Skor: <b>{badge}</b>\n\n"
+        f"📋 <b>Değerlendirme:</b>\n{reasons_text}\n"
     )
-    
-    if len(score_msg) > 3500:
-        score_msg = score_msg[:3400] + "..."
-    
-    try:
-        await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
-    except Exception as e:
-        logger.error(f"Rapor HTML Hatasi: {e}")
-        import re
-        clean_msg = re.sub(r'<[^>]+>', '', score_msg).replace("**", "")
-        await msg.edit_text(clean_msg[:4000])
+    if warning:
+        score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
+    score_msg += f"\n{safe_md(analysis)}"
 
-    # ── 7. Post önizleme ────────────────────────────────────────────────
+    if len(score_msg) > 4000:
+        score_msg = score_msg[:3990] + "\n<i>...kırpıldı</i>"
+    await msg.edit_text(score_msg, parse_mode=ParseMode.HTML)
+
+    # 6. Post önizleme + aksiyon butonları
     post_preview = (
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"🚀 <b>HAZIRLANAN POST:</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📣 <b>HAZIRLANAN POST:</b>\n\n"
         f"{safe_md(post)}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: {badge} | 📡 {total_sources} kaynak"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Skor: {badge}"
     )
-    
     if len(post_preview) > 4096:
         post_preview = post_preview[:4086] + "..."
-    
-    try:
-        await update.effective_message.reply_text(
-            post_preview,
-            parse_mode=ParseMode.HTML,
-            reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
-        )
-    except Exception as e:
-        logger.error(f"Onizleme Hatasi: {e}")
-        await update.effective_message.reply_text("⚠️ Post önizlemesi hazırlandı (Filtresiz).")
+
+    await update.effective_message.reply_text(
+        post_preview,
+        parse_mode=ParseMode.HTML,
+        reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
+    )
 
 # ══════════════════════════════════════════════════════════
 #  GRUBA GÖNDERME
@@ -1564,31 +1191,27 @@ async def _send_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE, wit
 
     platform = context.user_data.get("last_post_platform", "cryptocurrency airdrop")
 
-    # ── Premium emojileri uygula ─────────────────────────────────────────
-    premium_post = apply_custom_emojis(safe_md(post))
-
     try:
         if with_photo:
             img_url = get_image(f"{platform} crypto blockchain token")
             caption = post[:1024] if len(post) > 1024 else post
-            premium_caption = apply_custom_emojis(safe_md(caption))
             if img_url:
                 await context.bot.send_photo(
                     chat_id=GROUP_CHAT_ID,
                     photo=img_url,
-                    caption=premium_caption,
+                    caption=safe_md(caption),
                     parse_mode=ParseMode.HTML,
                 )
             else:
                 await context.bot.send_message(
                     chat_id=GROUP_CHAT_ID,
-                    text=premium_post,
+                    text=safe_md(post),
                     parse_mode=ParseMode.HTML,
                 )
         else:
             await context.bot.send_message(
                 chat_id=GROUP_CHAT_ID,
-                text=premium_post,
+                text=safe_md(post),
                 parse_mode=ParseMode.HTML,
             )
 
@@ -1698,8 +1321,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"♻️ *{fmt_label.get(fmt,'Post')} yeniden yazılıyor...*",
             parse_mode=ParseMode.HTML,
         )
-        score_data = context.user_data.get("last_score")
-        post = build_post(analysis, project, fmt=fmt, score_data=score_data)
+        post = build_post(analysis, project, fmt=fmt)
         context.user_data["last_post"]   = post
         context.user_data["final_post"]  = post
         context.user_data["has_link"]    = False
@@ -1729,8 +1351,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{fmt_label[fmt]} *format hazırlanıyor...*",
             parse_mode=ParseMode.HTML,
         )
-        score_data = context.user_data.get("last_score")
-        post = build_post(analysis, project, fmt=fmt, score_data=score_data)
+        post = build_post(analysis, project, fmt=fmt)
         context.user_data["last_post"]  = post
         context.user_data["final_post"] = post
         context.user_data["has_link"]   = False
