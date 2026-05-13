@@ -1094,7 +1094,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML,
         )
         img_url = get_image(f"{platform} crypto")
-        caption = safe_md(updated[:1024] if len(updated) > 1024 else updated)
+        caption = updated[:1024] if len(updated) > 1024 else updated
 
         if img_url:
             try:
@@ -1105,25 +1105,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=post_actions(has_link=True),
                 )
             except Exception:
-                # Görsel gönderilemezse metin olarak göster
-                preview = (
-                    f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
-                    f"Hazır! Gruba gönderebilirsin."
-                )
+                preview = f"📣 <b>GÜNCEL POST:</b>\n\n{updated}\n\nHazır! Gruba gönderebilirsin."
                 if len(preview) > 4096:
-                    preview = preview[:4086] + "_"
+                    preview = preview[:4086] + "..."
                 await update.message.reply_text(
                     preview,
                     parse_mode=ParseMode.HTML,
                     reply_markup=post_actions(has_link=True),
                 )
         else:
-            preview = (
-                f"📣 *GÜNCEL POST:*\n\n{safe_md(updated)}\n\n"
-                f"Hazır! Gruba gönderebilirsin."
-            )
+            preview = f"📣 <b>GÜNCEL POST:</b>\n\n{updated}\n\nHazır! Gruba gönderebilirsin."
             if len(preview) > 4096:
-                preview = preview[:4086] + "_"
+                preview = preview[:4086] + "..."
             await update.message.reply_text(
                 preview,
                 parse_mode=ParseMode.HTML,
@@ -1268,7 +1261,13 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     )
     if warning:
         score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
-    score_msg += f"\n{safe_md(analysis)}"
+    # Analysis düz metin — HTML-unsafe karakterleri escape et, basit markdown'ı dönüştür
+    safe_analysis = (analysis
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    score_msg += f"\n{safe_analysis}"
 
     if len(score_msg) > 4000:
         score_msg = score_msg[:3990] + "\n<i>...kırpıldı</i>"
@@ -1278,18 +1277,34 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     post_preview = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📣 <b>HAZIRLANAN POST:</b>\n\n"
-        f"{safe_md(post)}\n\n"
+        f"{post}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"Skor: {badge}"
     )
     if len(post_preview) > 4096:
         post_preview = post_preview[:4086] + "..."
 
-    await update.effective_message.reply_text(
-        post_preview,
-        parse_mode=ParseMode.HTML,
-        reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
-    )
+    try:
+        await update.effective_message.reply_text(
+            post_preview,
+            parse_mode=ParseMode.HTML,
+            reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
+        )
+    except Exception as e:
+        logger.error(f"Post önizleme HTML hatası: {e}")
+        # HTML parse hatası → tagları sil, düz metin olarak dene
+        plain = re.sub(r'<[^>]+>', '', post_preview)
+        try:
+            await update.effective_message.reply_text(
+                plain,
+                reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
+            )
+        except Exception as e2:
+            logger.error(f"Post önizleme düz metin hatası: {e2}")
+            await update.effective_message.reply_text(
+                f"✅ Post hazır ama önizleme gösterilemedi ({e2}). Yenile butonunu dene.",
+                reply_markup=post_actions_extended(has_link=False, fmt="long", score=score),
+            )
 
 # ══════════════════════════════════════════════════════════
 #  GRUBA GÖNDERME
@@ -1463,7 +1478,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["has_link"]   = False
         preview = f"♻️ <b>YENİLENEN POST ({fmt_label.get(fmt,'').upper()}):</b>\n\n{post}\n\n☝️ <b>🔗 Link Ekle</b> butonuna bas."
         if len(preview) > 4096: preview = preview[:4086] + "..."
-        await msg.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=fmt))
+        try:
+            await msg.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=fmt))
+        except Exception:
+            await msg.edit_text(re.sub(r'<[^>]+>', '', preview), reply_markup=post_actions(has_link=False, fmt=fmt))
 
     elif data in ("fmt_long", "fmt_short", "fmt_summary"):
         analysis = context.user_data.get("last_analysis")
@@ -1490,7 +1508,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         icon = "📄" if fmt=="long" else "📝" if fmt=="short" else "⚡"
         preview = f"{icon} <b>{fmt_label[fmt].upper()} FORMAT:</b>\n\n{post}\n\n🔗 <b>Link Ekle</b> butonuna bas."
         if len(preview) > 4096: preview = preview[:4086] + "..."
-        await msg.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=fmt))
+        try:
+            await msg.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=fmt))
+        except Exception:
+            await msg.edit_text(re.sub(r'<[^>]+>', '', preview), reply_markup=post_actions(has_link=False, fmt=fmt))
 
 
     elif data == "scan_menu":
@@ -1581,17 +1602,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         record_post_use(lid)
         await q.answer(f"✅ {lnk['platform']} linki eklendi!", show_alert=False)
         fmt = context.user_data.get("post_fmt", "long")
-        preview = (
-            f"✅ *{lnk['platform']} linki eklendi!*\n\n"
-            f"{safe_md(updated)}"
-        )
+        preview = f"✅ <b>{lnk['platform']} linki eklendi!</b>\n\n{updated}"
         if len(preview) > 4096:
-            preview = preview[:4086] + "_"
-        await q.message.reply_text(
-            preview,
-            parse_mode=ParseMode.HTML,
-            reply_markup=post_actions(has_link=True, fmt=fmt),
-        )
+            preview = preview[:4086] + "..."
+        try:
+            await q.message.reply_text(
+                preview,
+                parse_mode=ParseMode.HTML,
+                reply_markup=post_actions(has_link=True, fmt=fmt),
+            )
+        except Exception:
+            await q.message.reply_text(
+                re.sub(r'<[^>]+>', '', preview),
+                reply_markup=post_actions(has_link=True, fmt=fmt),
+            )
 
     elif data == "link_clear":
         _LINK_STORE.clear()
@@ -1678,9 +1702,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["last_post"]  = opp.get("post","")
             context.user_data["final_post"] = opp.get("post","")
             context.user_data["last_project"] = opp.get("name","")
-            preview = f"📣 <b>POST:</b>\n\n{safe_md(opp.get('post',''))}"
+            preview = f"📣 <b>POST:</b>\n\n{opp.get('post','')}"
             if len(preview) > 4096: preview = preview[:4086] + "..."
-            await q.message.reply_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False))
+            try:
+                await q.message.reply_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False))
+            except Exception:
+                await q.message.reply_text(re.sub(r'<[^>]+>', '', preview), reply_markup=post_actions(has_link=False))
         else:
             await q.answer("Fırsat bulunamadı.", show_alert=True)
 
@@ -1713,9 +1740,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["final_post"]   = p["post"]
             context.user_data["last_project"] = p["project"]
             context.user_data["post_fmt"]     = p["fmt"]
-            preview = f"📄 <b>{p['project']}</b> | {p['date']}\n\n{safe_md(p['post'])}"
+            preview = f"📄 <b>{p['project']}</b> | {p['date']}\n\n{p['post']}"
             if len(preview) > 4096: preview = preview[:4086] + "..."
-            await q.message.reply_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=p["fmt"]))
+            try:
+                await q.message.reply_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt=p["fmt"]))
+            except Exception:
+                await q.message.reply_text(re.sub(r'<[^>]+>', '', preview), reply_markup=post_actions(has_link=False, fmt=p["fmt"]))
         else:
             await q.answer("Post bulunamadı.", show_alert=True)
 
