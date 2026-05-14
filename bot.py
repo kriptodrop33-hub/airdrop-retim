@@ -781,14 +781,14 @@ bonus kazanma fırsatı 🤔
 ——————————————————
 💬 <b>YAPMAN GEREKENLER:</b>
 
-①  Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)
-②  [adım 2]
-③  [adım 3]
-④  [adım 4 — yoksa sil]
+1️⃣  Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)
+2️⃣  [adım 2]
+3️⃣  [adım 3]
+4️⃣  [adım 4 — yoksa sil]
 
-✨ Hemen Kaydol: [🔗 TIKLA 🔗] 
+🔗 Hemen Kaydol: 🔗 [🔗 TIKLA 🔗] 🔗
 
-✨ Etkinlik sayfası: [🔗 TIKLA 🔗]
+🔗 Etkinlik sayfası: 🔗 [🔗 TIKLA 🔗] 🔗
 
 ——————————————————
 Görev zorluğu: [Kolay/Orta/Zor]
@@ -841,13 +841,14 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"Bugünün tarihi: {datetime.now().strftime('%d.%m.%Y')}\n\n"
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
         f"=== KESİN KURALLAR ===\n"
-        f"1. SADECE yukarıdaki analizde AÇIKÇA geçen rakamları kullan\n"
-        f"2. Referral kodu, promo kodu, davet kodu YAZMA — analizde varsa bile\n"
+        f"1. SADECE yukarıdaki analizde AÇIKÇA geçen GERÇEKÇİ ve GARANTİ rakamları kullan\n"
+        f"2. Referral kodu, promo kodu, davet kodu YAZMA\n"
         f"3. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
         f"4. Adımları analizden al, kendin adım uydurma\n"
-        f"5. [🔗 TIKLA 🖊] placeholder'ını koru — URL yazma\n"
-        f"6. Kampanya tarihi eski görünse bile POSTU YAZ — NOT satırına 'Kampanya durumu doğrulanamamıştır, katılmadan önce kontrol ediniz' ekle\n"
-        f"7. ASLA '&', '<', '>' karakterlerini metin içinde kullanma! (Sadece HTML tagları olan <b>, <u> vb. kullan). Özel karakterler yerine 've', 'altında', 'üzerinde' kelimelerini kullan."
+        f"5. [🔗 TIKLA 🔗] placeholder'ını koru — URL yazma\n"
+        f"6. EĞER kampanyanın son katılım tarihi bugünden ( {datetime.now().strftime('%d.%m.%Y')} ) eskiyse, son tarihi 'SÜRESİ DOLMUŞ' yaz ve uyarı ekle\n"
+        f"7. 'Up to 10,000 USDT' gibi abartılı veya çekilişle olan ödülleri YAZMA. Sadece yeni üyenin kesin alacağı ödülü yaz (örn: '10 USDT'). Kesin ödül yoksa 'Kampanya ödülü' yaz.\n"
+        f"8. ASLA '&', '<', '>' karakterlerini metin içinde kullanma!"
     )
 
 
@@ -1314,8 +1315,7 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📣 <b>HAZIRLANAN POST:</b>\n\n"
         f"{post}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Skor: {badge}"
+        f"━━━━━━━━━━━━━━━━━━━━"
     )
     if len(post_preview) > 4096:
         post_preview = post_preview[:4086] + "..."
