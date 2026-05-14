@@ -272,31 +272,90 @@ def format_score_badge(score: int, verdict: str) -> str:
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 
-# ── Premium Custom Emoji ID'leri (Telegram Premium paketleri) ─────────────────
-# HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
-# Bot'un Premium aboneliği varsa animasyonlu görünür, yoksa fallback emoji görünür
-CE = {
-    "fire":    "<tg-emoji emoji-id=\"5199885118214255386\">🔥</tg-emoji>",
-    "diamond": "<tg-emoji emoji-id=\"5471952986970267163\">💎</tg-emoji>",
-    "rocket":  "<tg-emoji emoji-id=\"5359085254097315024\">🚀</tg-emoji>",
-    "star":    "<tg-emoji emoji-id=\"5447644880824181073\">⭐</tg-emoji>",
-    "money":   "<tg-emoji emoji-id=\"5372981976804415999\">💰</tg-emoji>",
-    "warn":    "<tg-emoji emoji-id=\"5467654876416978621\">⚡</tg-emoji>",
-    "check":   "<tg-emoji emoji-id=\"5436040291507899402\">✅</tg-emoji>",
-    "gift":    "<tg-emoji emoji-id=\"5445284980978621387\">🎁</tg-emoji>",
-    "crown":   "<tg-emoji emoji-id=\"5471952986970267163\">👑</tg-emoji>",
-    "chart":   "<tg-emoji emoji-id=\"5431815452437257407\">📈</tg-emoji>",
-    "trophy":  "<tg-emoji emoji-id=\"5359085254097315024\">🏆</tg-emoji>",
-    "bell":    "<tg-emoji emoji-id=\"5407025283456817749\">🔔</tg-emoji>",
-    "pin":     "<tg-emoji emoji-id=\"5416114559863567478\">📌</tg-emoji>",
-    "tada":    "<tg-emoji emoji-id=\"5445284980978621387\">🎉</tg-emoji>",
-    "gem":     "<tg-emoji emoji-id=\"5471952986970267163\">💠</tg-emoji>",
-    "medal1":  "<tg-emoji emoji-id=\"5359085254097315024\">🥇</tg-emoji>",
-    "note":    "<tg-emoji emoji-id=\"5416114559863567478\">🗒</tg-emoji>",
-    "cal":     "<tg-emoji emoji-id=\"5407025283456817749\">📅</tg-emoji>",
-    "mega":    "<tg-emoji emoji-id=\"5416114559863567478\">📢</tg-emoji>",
-    "arrow":   "<tg-emoji emoji-id=\"5436040291507899402\">➡️</tg-emoji>",
+# ══════════════════════════════════════════════════════════
+#  PREMIUM CUSTOM EMOJI SİSTEMİ
+# ══════════════════════════════════════════════════════════
+_EMOJI_MAP_FILE = "emoji_map.json"
+
+_EMOJI_REGISTRY = {
+    "🔥": ("fire",    "Ateş"), "💎": ("diamond", "Elmas"), "🚀": ("rocket",  "Roket"),
+    "⭐": ("star",    "Yıldız"), "💰": ("money",   "Para"), "⚡": ("warn",    "Yıldırım"),
+    "✅": ("check",   "Onay"), "🎁": ("gift",    "Hediye"), "👑": ("crown",   "Taç"),
+    "📈": ("chart",   "Grafik"), "🏆": ("trophy",  "Kupa"), "🔔": ("bell",    "Çan"),
+    "📌": ("pin",     "İğne"), "🎉": ("tada",    "Kutlama"), "💠": ("gem",     "Mücevher"),
+    "🥇": ("medal1",  "Madalya"), "🗒️": ("note",    "Not"), "📅": ("cal",     "Takvim"),
+    "📢": ("mega",    "Megafon"), "➡️": ("arrow",   "Ok"),
+    "🟢": ("green",   "Yeşil daire"), "🟡": ("yellow",  "Sarı daire"), "🔴": ("red",     "Kırmızı daire"),
+    "🤔": ("think",   "Düşünen"), "🔗": ("link",    "Link"),
+    "📝": ("memo",    "Kısa not"), "⚠️": ("warning", "Uyarı"),
+    "🪂": ("parachute","Paraşüt"), "📱": ("mobile",  "Mobil"), "👥": ("people",  "İnsanlar"),
 }
+
+def _load_emoji_map() -> dict:
+    if os.path.exists(_EMOJI_MAP_FILE):
+        try:
+            with open(_EMOJI_MAP_FILE, "r", encoding="utf-8") as f: return json.load(f)
+        except Exception: pass
+    return {}
+
+def _save_emoji_map(data: dict):
+    try:
+        with open(_EMOJI_MAP_FILE, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e: logger.error(f"Emoji map kaydetme hatası: {e}")
+
+def _build_ce() -> dict:
+    emoji_map = _load_emoji_map()
+    ce = {}
+    for emoji_unicode, (key, _) in _EMOJI_REGISTRY.items():
+        custom_id = emoji_map.get(emoji_unicode)
+        if custom_id: ce[key] = f'<tg-emoji emoji-id="{custom_id}">{emoji_unicode}</tg-emoji>'
+        else: ce[key] = emoji_unicode
+    return ce
+
+CE = _build_ce()
+
+def _reload_ce():
+    global CE
+    CE = _build_ce()
+
+async def _discover_from_sticker_pack(context: ContextTypes.DEFAULT_TYPE, pack_name: str) -> int:
+    try:
+        sticker_set = await context.bot.get_sticker_set(pack_name)
+        emoji_map = _load_emoji_map()
+        found = 0
+        for sticker in sticker_set.stickers:
+            if hasattr(sticker, 'custom_emoji_id') and sticker.custom_emoji_id:
+                emoji_unicode = sticker.emoji
+                if emoji_unicode and emoji_unicode not in emoji_map:
+                    emoji_map[emoji_unicode] = sticker.custom_emoji_id
+                    found += 1
+        if found > 0: _save_emoji_map(emoji_map); _reload_ce()
+        return found
+    except Exception as e:
+        logger.error(f"Sticker pack keşif hatası ({pack_name}): {e}")
+        return -1
+
+def _extract_custom_emojis_from_message(message) -> int:
+    emoji_map = _load_emoji_map()
+    found = 0
+    if message.entities:
+        for entity in message.entities:
+            if entity.type and entity.type.value == "custom_emoji":
+                custom_id = entity.custom_emoji_id
+                if custom_id and message.text:
+                    emoji_text = message.text[entity.offset:entity.offset + entity.length]
+                    if emoji_text and emoji_text not in emoji_map:
+                        emoji_map[emoji_text] = custom_id; found += 1
+    if message.caption and message.caption_entities:
+        for entity in message.caption_entities:
+            if entity.type and entity.type.value == "custom_emoji":
+                custom_id = entity.custom_emoji_id
+                if custom_id:
+                    emoji_text = message.caption[entity.offset:entity.offset + entity.length]
+                    if emoji_text and emoji_text not in emoji_map:
+                        emoji_map[emoji_text] = custom_id; found += 1
+    if found > 0: _save_emoji_map(emoji_map); _reload_ce()
+    return found
 
 # ══════════════════════════════════════════════════════════
 #  ADMIN GUARD
@@ -849,46 +908,20 @@ def _build_prompt(analysis: str, project_name: str) -> str:
 
 
 def _inject_premium_emojis(text: str) -> str:
-    """
-    AI çıktısındaki düz emojileri Telegram Premium tg-emoji sürümleriyle değiştirir.
-    tg-emoji zaten varsa tekrar eklemez — güvenli idempotent çalışır.
-    """
-    _MAP = [
-        ("🔥", CE["fire"]),
-        ("🚀", CE["rocket"]),
-        ("⭐", CE["star"]),
-        ("💰", CE["money"]),
-        ("⚡", CE["warn"]),
-        ("✅", CE["check"]),
-        ("🎁", CE["gift"]),
-        ("👑", CE["crown"]),
-        ("📈", CE["chart"]),
-        ("🏆", CE["trophy"]),
-        ("🔔", CE["bell"]),
-        ("📌", CE["pin"]),
-        ("🎉", CE["tada"]),
-        ("💠", CE["gem"]),
-        ("🥇", CE["medal1"]),
-        ("🗒", CE["note"]),
-        ("📅", CE["cal"]),
-        ("📢", CE["mega"]),
-        ("➡️", CE["arrow"]),
-    ]
-    for plain, tg in _MAP:
-        if plain in text and tg not in text:
-            text = text.replace(plain, tg)
+    emoji_map = _load_emoji_map()
+    if not emoji_map: return text
+    for emoji_unicode, custom_id in emoji_map.items():
+        if not custom_id: continue
+        tg_tag = f'<tg-emoji emoji-id="{custom_id}">{emoji_unicode}</tg-emoji>'
+        if tg_tag in text: continue
+        if emoji_unicode in text:
+            _protected = []
+            def _protect(m): _protected.append(m.group(0)); return f"\x00PROT_{len(_protected)-1}\x00"
+            text_protected = re.sub(r'<tg-emoji\s+emoji-id="[^"]+">[^<]*</tg-emoji>', _protect, text)
+            text_protected = text_protected.replace(emoji_unicode, tg_tag)
+            def _unprotect(m): return _protected[int(m.group(1))] if int(m.group(1)) < len(_protected) else ""
+            text = re.sub(r'\x00PROT_(\d+)\x00', _unprotect, text_protected)
     return text
-
-
-def build_post(analysis: str, project_name: str, fmt: str = "long", score: int = None, verdict: str = None) -> str:
-    """fmt: 'long' | 'short' | 'summary'. Skor programatik olarak eklenir."""
-    prompt = _build_prompt(analysis, project_name)
-    if fmt == "short":
-        raw = ai(get_post_system_short(), prompt, tokens=600, temp=0.3)
-    elif fmt == "summary":
-        raw = ai(get_post_system_summary(), prompt, tokens=250, temp=0.3)
-    else:
-        raw = ai(get_post_system(), prompt, tokens=1400, temp=0.3)
 
     # Premium emoji inject — AI tagları kaçırmış olsa bile garantile
     raw = _inject_premium_emojis(raw)
@@ -956,25 +989,25 @@ def html_escape(text: str) -> str:
 def md_to_html(text: str) -> str:
     """AI'nin ürettiği Markdown benzeri metni Telegram HTML'e çevir."""
     import re
-    # Hashtag temizle
+    # ADIM 1: tg-emoji taglarını koru — geçici placeholder'a al
+    _tg_emoji_store = []
+    def _save_tg_emoji(m): _tg_emoji_store.append(m.group(0)); return f"__TGEMOJI_{len(_tg_emoji_store) - 1}__"
+    text = re.sub(r'<tg-emoji\s+emoji-id="[^"]+">[^<]*</tg-emoji>', _save_tg_emoji, text)
+    
+    # ADIM 2: Markdown → HTML
     text = re.sub(r'(?m)^#+\s.*$', "", text)
     text = re.sub(r'#\w+', "", text)
-    # **bold** → <b>bold</b>
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-    # *bold* → <b>bold</b>
     text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<b>\1</b>', text)
-    # _italic_ → <i>italic</i>
-    text = re.sub(r'_(.+?)_', r'<i>\1</i>', text)
-    # `code` → <code>code</code>
+    text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<i>\1</i>', text)
     text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
-    # Birden fazla boş satırı teke indir
     text = re.sub(r'\n{3,}', "\n\n", text)
+    
+    # ADIM 3: tg-emoji taglarını geri yükle
+    def _restore_tg_emoji(m): return _tg_emoji_store[int(m.group(1))] if int(m.group(1)) < len(_tg_emoji_store) else ""
+    text = re.sub(r'__TGEMOJI_(\d+)__', _restore_tg_emoji, text)
     return text.strip()
-
-def safe_md(text: str) -> str:
-    """Geriye dönük uyumluluk — artık HTML döndürür."""
-    return md_to_html(text)
-
+    
 # ══════════════════════════════════════════════════════════
 #  KOMUTLAR
 # ══════════════════════════════════════════════════════════
@@ -1039,6 +1072,23 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @admin_only
 async def cmd_sendgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_to_group(update, context, with_photo=False)
+
+async def cmd_emoji_init(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("🔄 <b>Bilinen premium paketler taranıyor...</b>", parse_mode=ParseMode.HTML)
+    known_packs = ["AnimatedEmojis", "EmojiAnimatedEmojis", "PremiumEmojiPack", "TelegramAnimatedEmojis", "EmojiOne"]
+    total_found, results = 0, []
+    for pack_name in known_packs:
+        found = await _discover_from_sticker_pack(context, pack_name)
+        if found >= 0: results.append(f"✅ {pack_name}: {found} yeni"); total_found += found
+        else: results.append(f"❌ {pack_name}: bulunamadı")
+    total = len([v for v in _load_emoji_map().values() if v])
+    await msg.edit_text(f"🔄 <b>Tarama tamamlandı!</b>\n\n" + "\n".join(results) + f"\n\n📊 Yeni: <b>{total_found}</b> | Toplam: <b>{total}</b>", parse_mode=ParseMode.HTML)
+
+@admin_only
+async def cmd_emoji_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    _reload_ce(); lines = ["🧪 <b>PREMIUM EMOJİ TEST</b>\n━━━━━━━━━━━━━━━━━━━━\n"]
+    for key, value in CE.items(): lines.append(f"{key}: {value} {'✓ Premium' if 'tg-emoji' in value else '✗ Düz'}")
+    await update.message.reply_text("\n".join(lines)[:4000], parse_mode=ParseMode.HTML)
 
 # ══════════════════════════════════════════════════════════
 #  MESAJ İŞLEYİCİ — URL veya Airdrop Adı
@@ -1788,6 +1838,8 @@ def main():
     app.add_handler(CommandHandler("scan",      cmd_scan,      filters=private))
     app.add_handler(CommandHandler("post",      cmd_post,      filters=private))
     app.add_handler(CommandHandler("sendgroup", cmd_sendgroup, filters=private))
+    app.add_handler(CommandHandler("emoji_init", cmd_emoji_init))
+    app.add_handler(CommandHandler("emoji_test", cmd_emoji_test))
 
     app.add_handler(CallbackQueryHandler(handle_callback))  # callback guard'ı decorator'da
     app.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, handle_message))
