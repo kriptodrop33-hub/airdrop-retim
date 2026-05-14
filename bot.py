@@ -276,26 +276,29 @@ tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 # HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 # Bot'un Premium aboneliği varsa animasyonlu görünür, yoksa fallback emoji görünür
 CE = {
-    "fire":    "<tg-emoji emoji-id=\"5199885118214255386\">🔥</tg-emoji>",
-    "diamond": "<tg-emoji emoji-id=\"5471952986970267163\">💎</tg-emoji>",
-    "rocket":  "<tg-emoji emoji-id=\"5359085254097315024\">🚀</tg-emoji>",
-    "star":    "<tg-emoji emoji-id=\"5447644880824181073\">⭐</tg-emoji>",
-    "money":   "<tg-emoji emoji-id=\"5372981976804415999\">💰</tg-emoji>",
-    "warn":    "<tg-emoji emoji-id=\"5467654876416978621\">⚡</tg-emoji>",
-    "check":   "<tg-emoji emoji-id=\"5436040291507899402\">✅</tg-emoji>",
-    "gift":    "<tg-emoji emoji-id=\"5445284980978621387\">🎁</tg-emoji>",
-    "crown":   "<tg-emoji emoji-id=\"5471952986970267163\">👑</tg-emoji>",
-    "chart":   "<tg-emoji emoji-id=\"5431815452437257407\">📈</tg-emoji>",
-    "trophy":  "<tg-emoji emoji-id=\"5359085254097315024\">🏆</tg-emoji>",
-    "bell":    "<tg-emoji emoji-id=\"5407025283456817749\">🔔</tg-emoji>",
-    "pin":     "<tg-emoji emoji-id=\"5416114559863567478\">📌</tg-emoji>",
-    "tada":    "<tg-emoji emoji-id=\"5445284980978621387\">🎉</tg-emoji>",
-    "gem":     "<tg-emoji emoji-id=\"5471952986970267163\">💠</tg-emoji>",
-    "medal1":  "<tg-emoji emoji-id=\"5359085254097315024\">🥇</tg-emoji>",
-    "note":    "<tg-emoji emoji-id=\"5416114559863567478\">🗒</tg-emoji>",
-    "cal":     "<tg-emoji emoji-id=\"5407025283456817749\">📅</tg-emoji>",
-    "mega":    "<tg-emoji emoji-id=\"5416114559863567478\">📢</tg-emoji>",
-    "arrow":   "<tg-emoji emoji-id=\"5436040291507899402\">➡️</tg-emoji>",
+    "fire":    "<tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji>",
+    "diamond": "<tg-emoji emoji-id=\"5427168083074628963\">💎</tg-emoji>",
+    "rocket":  "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
+    "star":    "<tg-emoji emoji-id=\"5208801655004350721\">🌟</tg-emoji>",
+    "money":   "<tg-emoji emoji-id=\"6235340371082086934\">💰</tg-emoji>",
+    "warn":    "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>",
+    "check":   "<tg-emoji emoji-id=\"5217497254381754877\">✅</tg-emoji>",
+    "gift":    "<tg-emoji emoji-id=\"5203996991054432397\">🎁</tg-emoji>",
+    "crown":   "<tg-emoji emoji-id=\"5217822164362739968\">👑</tg-emoji>",
+    "chart":   "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",
+    "trophy":  "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",
+    "bell":    "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",
+    "pin":     "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",
+    "tada":    "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",
+    "gem":     "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",
+    "medal1":  "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",
+    "note":    "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",
+    "cal":     "<tg-emoji emoji-id=\"6235362644782484636\">⏰</tg-emoji>",
+    "mega":    "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",
+    "arrow":   "<tg-emoji emoji-id=\"5325547803936572038\">✨</tg-emoji>",
+    "cash":    "<tg-emoji emoji-id=\"5233326571099534068\">💸</tg-emoji>",
+    "red_circle": "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",
+    "green_circle": "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",
 }
 
 # ══════════════════════════════════════════════════════════
@@ -776,24 +779,24 @@ AYNEN bu yapıyı kullan:
 bonus kazanma fırsatı 🤔
 
 ——————————————————
-🗒 <b>YAPMAN GEREKENLER:</b>
+💬 <b>YAPMAN GEREKENLER:</b>
 
 ①  Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)
 ②  [adım 2]
 ③  [adım 3]
 ④  [adım 4 — yoksa sil]
 
-➡️ Hemen Kaydol: 🔗 [🔗 TIKLA 🖊] 🔗
+✨ Hemen Kaydol: [🔗 TIKLA 🔗] 
 
-➡️ Etkinlik sayfası: 🔗 [🔗 TIKLA 🖊] 🔗
+✨ Etkinlik sayfası: [🔗 TIKLA 🔗]
 
 ——————————————————
 Görev zorluğu: [Kolay/Orta/Zor]
 Ödül miktarı:  <b><u>[rakam]</u></b>
-Airdrop puanı: ⭐ ⭐ ⭐ ⭐ ⭐
+Airdrop puanı: 🌟 🌟 🌟 🌟 🌟
 
 ——————————————————
-📅 <b><u>Son gün [tarih — yoksa bu satırı sil]</u></b>
+⏰ <b><u>Son gün [tarih — yoksa bu satırı sil]</u></b>
 <b>NOT:</b> [varsa önemli not, yoksa sil]
 
 ——————————————————
@@ -816,7 +819,7 @@ YAPI:
 ① [adım 1]
 ② [adım 2]
 
-➡️ [🔗 TIKLA 🖊]
+✨ [🔗 TIKLA 🖊]
 📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 
@@ -827,7 +830,7 @@ def get_post_system_summary() -> str:
 HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
 
 FORMAT:
-🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ➡️ [🔗 TIKLA 🖊]
+🚀 <b>[PLATFORM]</b> — [ödül] kazan! [1 cümle nasıl]. ✨ [🔗 TIKLA 🖊]
 📢 @kriptodropduyuru 🎁 @kriptodroptr"""
 
 
@@ -860,23 +863,26 @@ def _inject_premium_emojis(text: str) -> str:
     _MAP = [
         ("🔥", CE["fire"]),
         ("🚀", CE["rocket"]),
-        ("⭐", CE["star"]),
+        ("🌟", CE["star"]),
         ("💰", CE["money"]),
-        ("⚡", CE["warn"]),
+        ("⚠️", CE["warn"]),
         ("✅", CE["check"]),
         ("🎁", CE["gift"]),
         ("👑", CE["crown"]),
         ("📈", CE["chart"]),
         ("🏆", CE["trophy"]),
         ("🔔", CE["bell"]),
-        ("📌", CE["pin"]),
+        ("🎯", CE["pin"]),
         ("🎉", CE["tada"]),
         ("💠", CE["gem"]),
         ("🥇", CE["medal1"]),
-        ("🗒", CE["note"]),
-        ("📅", CE["cal"]),
+        ("💬", CE["note"]),
+        ("⏰", CE["cal"]),
         ("📢", CE["mega"]),
-        ("➡️", CE["arrow"]),
+        ("✨", CE["arrow"]),
+        ("💸", CE["cash"]),
+        ("🔴", CE["red_circle"]),
+        ("🟢", CE["green_circle"]),
     ]
     for plain, tg in _MAP:
         text = text.replace(plain, tg)
@@ -995,6 +1001,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔍 <b>Airdrop Tara</b> → İnterneti tara, aktif airdropları listele\n"
         "✍️ <b>Post Oluştur</b> → Airdrop adı veya link at, derin araştır\n"
         "📢 <b>Gruba Gönder</b> → Hazır postu gruba gönder\n"
+        "✨ <b>/emojibul</b> → Premium emojinin ID'sini öğren\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
         "💡 <i>Airdrop adı veya linki direkt yazabilirsin.</i>",
         parse_mode=ParseMode.HTML,
@@ -1008,7 +1015,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start — Ana menü\n"
         "/scan — İnterneti tara, aktif airdropları listele\n"
         "/post `[isim]` — İsme göre araştır & post oluştur\n"
-        "/sendgroup — Son postu gruba gönder\n\n"
+        "/sendgroup — Son postu gruba gönder\n"
+        "/emojibul — Premium emojinin ID'sini öğren\n\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "💡 *Direkt mesaj:*\n"
         "• Bir URL at → sayfa derin araştırılır\n"
@@ -1043,8 +1051,17 @@ async def cmd_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_sendgroup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_to_group(update, context, with_photo=False)
 
+@admin_only
+async def cmd_emojibul(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "✨ <b>Premium Emoji Bulucu</b>\n\n"
+        "Bana herhangi bir Telegram Premium (hareketli) emojisini mesaj olarak gönder, ben sana onun <code>emoji-id</code> değerini vereyim.\n\n"
+        "<i>Bu ID'yi bot.py dosyasındaki CE sözlüğüne (satır ~278) ekleyebilirsin.</i>",
+        parse_mode=ParseMode.HTML,
+    )
+
 # ══════════════════════════════════════════════════════════
-#  MESAJ İŞLEYİCİ — URL veya Airdrop Adı
+#  MESAJ İŞLEYİCİ — URL veya Airdrop Adı veya Emoji
 # ══════════════════════════════════════════════════════════
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1054,7 +1071,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Sadece admin DM'i işle, başkasına sessiz kal
     if update.effective_user.id != ADMIN_CHAT_ID:
         return
-    text = update.message.text.strip()
+        
+    # Eğer mesaj bir custom emoji içeriyorsa ID'sini ver (kullanıcı /emojibul komutu sonrası emoji atmış olabilir)
+    if update.message.entities:
+        custom_emojis = [ent for ent in update.message.entities if ent.type == "custom_emoji"]
+        if custom_emojis:
+            response = "✨ <b>Gönderdiğin Emojilerin ID'leri:</b>\n\n"
+            for ent in custom_emojis:
+                emoji_char = update.message.text[ent.offset:ent.offset+ent.length]
+                response += f"Emoji: {emoji_char}\nID: <code>{ent.custom_emoji_id}</code>\n"
+                response += f"Kullanım:\n<code>&lt;tg-emoji emoji-id=\"{ent.custom_emoji_id}\"&gt;{emoji_char}&lt;/tg-emoji&gt;</code>\n\n"
+            await update.message.reply_text(response, parse_mode=ParseMode.HTML)
+            return
+
+    text = update.message.text
+    if not text:
+        return
+    text = text.strip()
     waiting = context.user_data.get("waiting_for")
 
     # Yeni kayıt linki ekleme state
@@ -1823,9 +1856,10 @@ def main():
     app.add_handler(CommandHandler("scan",      cmd_scan,      filters=private))
     app.add_handler(CommandHandler("post",      cmd_post,      filters=private))
     app.add_handler(CommandHandler("sendgroup", cmd_sendgroup, filters=private))
+    app.add_handler(CommandHandler("emojibul",  cmd_emojibul,  filters=private))
 
     app.add_handler(CallbackQueryHandler(handle_callback))  # callback guard'ı decorator'da
-    app.add_handler(MessageHandler(private & filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(private & ~filters.COMMAND, handle_message))
 
     logger.info("🚀 Airdrop Bot başlatıldı.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
