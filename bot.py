@@ -305,6 +305,15 @@ CE = {
     "rocket": "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
     "tada": "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",
     "chart": "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",
+    "gift": "<tg-emoji emoji-id=\"5203996991054432397\">🎁</tg-emoji>",
+    "crown": "<tg-emoji emoji-id=\"5217822164362739968\">👑</tg-emoji>",
+    "trophy": "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",
+    "bell": "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",
+    "gem": "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",
+    "mega": "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",
+    "red_circle": "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",
+    "yellow_circle": "<tg-emoji emoji-id=\"5411135756053780000\">🟡</tg-emoji>",
+    "green_circle": "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",
 }
 
 # ══════════════════════════════════════════════════════════
@@ -770,7 +779,7 @@ HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak.
 {CE['n2']} [adım 2]
 {CE['n3']} [adım 3]
 
-{CE['link']} <b>Kayıt Linki:</b> <a href="[URL]"><b>[🔗 TIKLA 🖊]</b></a>
+{CE['link']} <b>Kayıt Linki:</b> <a href="[URL]"><b>[🔗 TIKLA 🔗]</b></a>
 
 ——————————————————
 {CE['chart']} <b>DETAYLAR:</b>
@@ -785,7 +794,7 @@ HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak.
 def get_post_system_short() -> str:
     return f"""KriptoDropTR için kısa airdrop postu yaz.
 {CE['money']} Ödül: [rakam] | {CE['cal']} Tarih: [bitiş]
-✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Maks 400 karakter | Türkçe
+✅ HTML: <b>kalın</b> | Link: [🔗 TIKLA 🔗] | Maks 400 karakter | Türkçe
 
 YAPI:
 {CE['rocket']} <b>[PLATFORM] Airdrop!</b>
@@ -794,17 +803,17 @@ YAPI:
 {CE['n1']} [adım 1]
 {CE['n2']} [adım 2]
 
-{CE['link']} [🔗 TIKLA 🖊]
+{CE['link']} [🔗 TIKLA 🔗]
 📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 
 # ── Özet format ───────────────────────────────────────────────────────────────
 def get_post_system_summary() -> str:
     return f"""KriptoDropTR için 2-3 satır airdrop özeti yaz.
-HTML: <b>kalın</b> | Link: [🔗 TIKLA 🖊] | Türkçe
+HTML: <b>kalın</b> | Link: [🔗 TIKLA 🔗] | Türkçe
 
 {CE['rocket']} <b>[PLATFORM]</b> — [ödül] kazan! {CE['cal']} [tarih].
-{CE['link']} [🔗 TIKLA 🖊]"""
+{CE['link']} [🔗 TIKLA 🔗]"""
 
 
 def _build_prompt(analysis: str, project_name: str) -> str:
@@ -834,6 +843,16 @@ def _inject_premium_emojis(text: str) -> str:
     text = re.sub(r'</?tg-emoji[^>]*>', '', text)
     
     _MAP = [
+        ("1️⃣", CE.get("n1", "1️⃣")),
+        ("2️⃣", CE.get("n2", "2️⃣")),
+        ("3️⃣", CE.get("n3", "3️⃣")),
+        ("4️⃣", CE.get("n4", "4️⃣")),
+        ("5️⃣", CE.get("n5", "5️⃣")),
+        ("6️⃣", CE.get("n6", "6️⃣")),
+        ("7️⃣", CE.get("n7", "7️⃣")),
+        ("8️⃣", CE.get("n8", "8️⃣")),
+        ("9️⃣", CE.get("n9", "9️⃣")),
+        ("0️⃣", CE.get("n0", "0️⃣")),
         ("🔥", CE.get("fire", "🔥")),
         ("🚀", CE.get("rocket", "🚀")),
         ("🌟", CE.get("star", "🌟")),
@@ -855,6 +874,7 @@ def _inject_premium_emojis(text: str) -> str:
         ("✨", CE.get("arrow", "✨")),
         ("💸", CE.get("cash", "💸")),
         ("🔴", CE.get("red_circle", "🔴")),
+        ("🟡", CE.get("yellow_circle", "🟡")),
         ("🟢", CE.get("green_circle", "🟢")),
     ]
     for plain, tg in _MAP:
@@ -1092,7 +1112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for"] = None
         post = context.user_data.get("last_post", "")
         link = text.strip()
-        updated = post.replace("[🔗 TIKLA 🖊]", link)
+        updated = post.replace("[🔗 TIKLA 🔗]", link).replace("[🔗 TIKLA 🖊]", link)
         context.user_data["final_post"] = updated
         context.user_data["has_link"] = True
 
