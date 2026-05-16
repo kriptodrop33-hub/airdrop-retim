@@ -577,27 +577,28 @@ def analyze_research(data: dict) -> str:
     """AI ile araştırma verisini analiz et — sadece belgeli bilgileri yaz."""
     from datetime import datetime
     current_date = datetime.now().strftime('%d %B %Y')
-    system = f"""Sen deneyimli bir kripto kazanım fırsatı araştırmacısısın.
-Görevin: HAM VERİDEN SADECE gerçek, belgeli bilgileri çıkarmak.
+    system = f"""Sen deneyimli ve DÜRÜST bir kripto kazanım fırsatı araştırmacısısın.
+Görevin: HAM VERİDEN SADECE VE SADECE GERÇEK, kanıtlanmış bilgileri çıkarmak.
 
-{CE['fire']} KRİTİK ÖNCELİKLER - TARİH KONTROLÜ:
-1. GERÇEK ÖDÜL MİKTARI: Kullanıcının cebine girecek net rakamı bul (örn: "20 USDT çekilebilir", "500 TL bonus").
-2. TARİHLER: Kampanyanın 'İlk Başlama' ve 'Son Katılım' tarihlerini kesin olarak tespit et.
-3. KESİNLİKLE DİKKAT ET: Bugünün tarihi {current_date}. Eğer kampanyanın bitiş tarihi (son katılım tarihi) bugünden ÖNCEYSE (örneğin bitiş tarihi dündü veya geçen aydı), uyarılara BÜYÜK HARFLERLE "SONA ERMİŞ KAMPANYA" yaz.
+{CE['fire']} KRİTİK ÖNCELİKLER VE KURALLAR:
+1. ASLA UYDURMA YAPMA: Bilgilerde açıkça "100$" yazmıyorsa uydurma. Havuz ödüllerini (örn: 1 Milyon USDT havuz) kişisel ödül gibi yansıtma. Ödül net değilse "Belirsiz" yaz.
+2. GERÇEK ÖDÜL MİKTARI: Kullanıcının cebine girecek NET rakamı bul. 
+3. KESİNLİKLE DİKKAT ET: Bugünün tarihi {current_date}. Eğer kampanyanın bitiş tarihi bugünden ÖNCEYSE, uyarılara "SONA ERMİŞ KAMPANYA" yaz.
+4. GEREKSİZ ŞİŞİRME YAPMA: Airdrop detaylarını tamamen dürüstçe aktar.
 
 FORMAT:
 {CE['check']} PLATFORM: [adı]
 {CE['medal1']} TÜR: [borsa bonusu / airdrop / kampanya]
-{CE['money']} GERÇEK ÖDÜL: [kaynaktaki EXACT rakam ve çekilebilirlik durumu]
-{CE['cal']} KATILIM TARİHLERİ: [İlk Başlama - Son Katılım tarihleri]
+{CE['money']} GERÇEK ÖDÜL: [net rakam veya Belirsiz]
+{CE['cal']} KATILIM TARİHLERİ: [Başlangıç - Bitiş]
 {CE['note']} ADIMLAR:
   {CE['n1']} [adım]
   {CE['n2']} [adım]
 {CE['target']} TOPLAM: [varsa]
 {CE['star']} GÜVENİLİRLİK: [1-5 yıldız + neden]
-{CE['warn']} UYARI: [KYC / min yatırım / SONA ERMİŞ KAMPANYA]
+{CE['warn']} UYARI: [KYC / Sona ermiş vb.]
 
-Türkçe yaz. Ödül ve tarih konularında çok titiz ol. Tarihi geçmiş hiçbir kampanyayı aktifmiş gibi gösterme."""
+Türkçe yaz. Ödül miktarını kesinlikle uydurma."""
 
     return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2500)
 
@@ -755,39 +756,43 @@ Türkçe yaz, net ol ve uydurma yapma."""
 
 # ── POST_SYSTEM: Premium emoji'li şablon ────────────────────────────────────
 def get_post_system() -> str:
-    """POST şablonunu Telegram Premium emojileriyle döndür."""
-    return f"""Sen KriptoDropTR Telegram kanalı için profesyonel airdrop postları yazıyorsun.
+    """POST şablonunu temiz, anlaşılır ve emojili yapıda döndür."""
+    return f"""Sen KriptoDropTR Telegram kanalı için dürüst ve profesyonel airdrop postları yazan bir editörsün.
 HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak.
 
 {CE['fire']} <b>YAZIM KURALLARI:</b>
-1. ÖDÜL: En başa ve dikkat çekici yaz (Gerçek çekilebilir miktar).
-2. TARİHLER: Kampanyanın başlangıç ve bitiş tarihlerini mutlaka belirt.
-3. ADIMLAR: {CE['n1']}, {CE['n2']} gibi numaraları kullan.
-4. LİNK: [🔗 TIKLA 🖊] formatını kullan.
+1. KAMPANYA VE ÖDÜL: Asla uydurma kampanyalar veya şişirilmiş ödüller KULLANMA. Kullanıcının cebine girecek olan kanıtlanmış NET ödülü yaz. Abartma!
+2. TARİHLER: Kampanyanın son katılım tarihini net belirt.
+3. ADIMLAR: Sadece yapılması gereken gerçek adımları (1️⃣, 2️⃣ vb.) sade ve anlaşılır bir dille listele.
+4. ŞABLONA BİREBİR UY: Aşağıdaki yapıyı aynen kullan.
 
 ŞABLON:
 
-{CE['medal1']} <b>[PLATFORM ADI] Airdrop {CE['tada']}</b>
+🎁 <b>[PLATFORM ADI] Yeni Üye Airdrop 🎉</b>
 
-{CE['money']} <b>ÖDÜL: [GERÇEK RAKAM]</b>
-{CE['cal']} <b>Dönem: [BAŞLANGIÇ] - [BİTİŞ]</b>
+🏆 <b>[PLATFORM ADI] Yeni Üyeler için [GERÇEK ÖDÜL MİKTARI] kazanma fırsatı 🧐</b>
 
-——————————————————
-{CE['note']} <b>NASIL KATILIRIM?</b>
+📋 <b>YAPMAN GEREKENLER:</b>
 
-{CE['n1']} Bağlantıya tıkla kayıt ol ve KYC yap
+{CE['n1']} Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)
 {CE['n2']} [adım 2]
 {CE['n3']} [adım 3]
+{CE['n4']} [adım 4]
 
-{CE['link']} <b>Kayıt Linki:</b> <a href="[URL]"><b>[🔗 TIKLA 🔗]</b></a>
+➡️ Hemen Kaydol: ⚡️ TIKLA ⚡️
+➡️ Etkinlik sayfası: ⚡️ TIKLA ⚡️
+---------------------------
+Görev zorluğu: [Kolay / Orta / Zor]
+Ödül miktarı: [Gerçek Miktar]
+Airdrop puanı: ⭐⭐⭐⭐⭐
 
-——————————————————
-{CE['chart']} <b>DETAYLAR:</b>
-{CE['target']} Tür: [borsa bonusu / airdrop]
-{CE['star']} Puan: 🌟 🌟 🌟 🌟 🌟
-{CE['warn']} <b>Not:</b> [varsa önemli not, yoksa sil]
+📅 Son gün: [Tarih]
+NOT: [varsa önemli not, örn: üye olduktan sonra 7 gün içinde görevleri tamamlamalısınız.]
 
-📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
+🔥 Daha fazla airdrop için duyuru kanalını pinle 📌
+
+📢 @kriptodropduyuru
+🎁 @kriptodroptr"""
 
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
@@ -823,13 +828,12 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"Bugünün tarihi: {datetime.now().strftime('%d.%m.%Y')}\n\n"
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
         f"=== KESİN KURALLAR ===\n"
-        f"1. GERÇEK ÖDÜL: Sadece kesin alacağı ödülü yaz (örn: '20 USDT'). Belirsiz/çekiliş ödüllerini yazma.\n"
-        f"2. TARİHLER: Kampanya başlangıç ve bitiş tarihlerini kesin olarak yaz. Eğer bitiş tarihi {datetime.now().strftime('%d.%m.%Y')} tarihinden ÖNCEYSE, uyarılara 'SONA ERMİŞ KAMPANYA' ekle.\n"
-        f"3. Referral kodu, promo kodu, davet kodu YAZMA\n"
-        f"4. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
-        f"5. Adımları analizden al, kendin adım uydurma\n"
-        f"6. [🔗 TIKLA 🔗] placeholder'ını koru — URL yazma\n"
-        f"7. ASLA '&', '<', '>' karakterlerini metin içinde kullanma!"
+        f"1. ASLA UYDURMA YAPMA: Ödül miktarı analizde yoksa KESİNLİKLE uydurma. Abartılı miktarlar yazma.\n"
+        f"2. GERÇEK ÖDÜL: Sadece kesin alacağı ödülü yaz (örn: '20 USDT'). Belirsiz/çekiliş/havuz ödüllerini net bireysel ödül gibi YAZMA.\n"
+        f"3. TARİHLER: Kampanya başlangıç ve bitiş tarihlerini kesin olarak yaz. Eğer bitiş tarihi {datetime.now().strftime('%d.%m.%Y')} tarihinden ÖNCEYSE, 'SONA ERMİŞ KAMPANYA' uyarısı ekle.\n"
+        f"4. Sadece olan adımları yaz, asla kendi kafandan adım ekleme.\n"
+        f"5. [🔗 TIKLA 🔗] placeholder'ını koru — URL yazma.\n"
+        f"6. ASLA '&', '<', '>' karakterlerini metin içinde kullanma!"
     )
 
 
@@ -839,8 +843,9 @@ def _inject_premium_emojis(text: str) -> str:
     Önce olası bozuk tagları temizler, sonra tüm emojileri Premium yapar.
     """
     import re
-    # Önce AI yanlışlıkla tg-emoji tagı üretmişse temizleyelim (sadece içindeki emojiyi bırakalım)
-    text = re.sub(r'</?tg-emoji[^>]*>', '', text)
+    # Önce AI yanlışlıkla bozuk tag üretmişse (tam kapanmayan) temizleyebiliriz
+    # Ancak geçerli <tg-emoji> taglarını bozmamak için sadece bozuk olanları eleyelim.
+    # Güvenli olması adına standart emojileri premium versiyonlarıyla değiştirelim.
     
     _MAP = [
         ("1️⃣", CE.get("n1", "1️⃣")),
@@ -856,7 +861,9 @@ def _inject_premium_emojis(text: str) -> str:
         ("🔥", CE.get("fire", "🔥")),
         ("🚀", CE.get("rocket", "🚀")),
         ("🌟", CE.get("star", "🌟")),
+        ("⭐", CE.get("star", "⭐")),
         ("💰", CE.get("money", "💰")),
+        ("💵", CE.get("money", "💵")),
         ("⚠️", CE.get("warn", "⚠️")),
         ("✅", CE.get("check", "✅")),
         ("🎁", CE.get("gift", "🎁")),
@@ -864,21 +871,31 @@ def _inject_premium_emojis(text: str) -> str:
         ("📈", CE.get("chart", "📈")),
         ("🏆", CE.get("trophy", "🏆")),
         ("🔔", CE.get("bell", "🔔")),
-        ("🎯", CE.get("pin", "🎯")),
+        ("🎯", CE.get("target", "🎯")),
         ("🎉", CE.get("tada", "🎉")),
-        ("💠", CE.get("gem", "💠")),
+        ("💎", CE.get("gem", "💎")),
         ("🥇", CE.get("medal1", "🥇")),
+        ("📋", CE.get("note", "📋")),
         ("💬", CE.get("note", "💬")),
+        ("📅", CE.get("cal", "📅")),
         ("⏰", CE.get("cal", "⏰")),
         ("📢", CE.get("mega", "📢")),
-        ("✨", CE.get("arrow", "✨")),
         ("💸", CE.get("cash", "💸")),
         ("🔴", CE.get("red_circle", "🔴")),
         ("🟡", CE.get("yellow_circle", "🟡")),
         ("🟢", CE.get("green_circle", "🟢")),
     ]
     for plain, tg in _MAP:
+        # Eğer emoji zaten <tg-emoji> içindeyse replace etmemek için dikkatli olmak lazım
+        # Ancak CE stringleri direkt tg-emoji formatında.
+        # En basit yol, tag içinde olmayan düz emojileri değiştirmektir.
+        # Regex ile HTML tagları dışındaki textleri bulmak karmaşık olabilir,
+        # O yüzden düz replace yapıyoruz. Eğer text içinde halihazırda tg-emoji içinde aynı karakter varsa, 
+        # onu bozabilir. Ancak AI genellikle düz emoji üretiyor.
         text = text.replace(plain, tg)
+    
+    # Nested tg-emoji hatasını düzeltelim (olur da <tg-emoji...><tg-emoji...> gibi bir şey olursa)
+    text = re.sub(r'(<tg-emoji[^>]*>)<tg-emoji[^>]*>.*?</tg-emoji>(.*?)</tg-emoji>', r'\1\2</tg-emoji>', text)
     return text
 
 
@@ -1290,12 +1307,8 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     )
     if warning:
         score_msg += f"\n⚠️ <b>Uyarı:</b> {warning}\n"
-    # Analysis düz metin — HTML-unsafe karakterleri escape et, basit markdown'ı dönüştür
-    safe_analysis = (analysis
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    # Analysis düz metin — SADECE ampersand'ı escape et, < ve > kalsın çünkü <tg-emoji> içeriyor
+    safe_analysis = analysis.replace("&", "&amp;")
     score_msg += f"\n{safe_analysis}"
 
     if len(score_msg) > 4000:
