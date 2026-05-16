@@ -276,44 +276,88 @@ tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 # HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 # Bot'un Premium aboneliği varsa animasyonlu görünür, yoksa fallback emoji görünür
 CE = {
-    "n1": "<tg-emoji emoji-id=\"6235451228482963747\">1️⃣</tg-emoji>",
-    "n2": "<tg-emoji emoji-id=\"6235429135171193517\">2️⃣</tg-emoji>",
-    "n3": "<tg-emoji emoji-id=\"6235389509802920161\">3️⃣</tg-emoji>",
-    "n4": "<tg-emoji emoji-id=\"6235582323769740174\">4️⃣</tg-emoji>",
-    "n5": "<tg-emoji emoji-id=\"6235449630755130445\">5️⃣</tg-emoji>",
-    "n6": "<tg-emoji emoji-id=\"6237665421563005272\">6️⃣</tg-emoji>",
-    "n7": "<tg-emoji emoji-id=\"6235508931368585981\">7️⃣</tg-emoji>",
-    "n8": "<tg-emoji emoji-id=\"6237790774478505967\">8️⃣</tg-emoji>",
-    "n9": "<tg-emoji emoji-id=\"6235688641390185541\">9️⃣</tg-emoji>",
-    "n0": "<tg-emoji emoji-id=\"6238037528939596392\">0️⃣</tg-emoji>",
-    "cash": "<tg-emoji emoji-id=\"5197434882321567830\">💵</tg-emoji>",
-    "money": "<tg-emoji emoji-id=\"5197434882321567830\">💵</tg-emoji>",
-    "link": "<tg-emoji emoji-id=\"5271604874419647061\">🔗</tg-emoji>",
-    "star": "<tg-emoji emoji-id=\"6005661956931850799\">⭐️</tg-emoji>",
-    "check": "<tg-emoji emoji-id=\"6296577138615125756\">✅</tg-emoji>",
-    "arrow_r": "<tg-emoji emoji-id=\"4969851488793788974\">➡️</tg-emoji>",
-    "arrow_l": "<tg-emoji emoji-id=\"4972453139463537420\">⬅️</tg-emoji>",
-    "cat_up": "<tg-emoji emoji-id=\"6080107204894002709\">🐱🔼</tg-emoji>",
-    "down": "<tg-emoji emoji-id=\"5449683594425410231\">🔽</tg-emoji>",
-    "empty": "<tg-emoji emoji-id=\"5447183459602669338\"></tg-emoji>",
-    "cal": "<tg-emoji emoji-id=\"6235362644782484636\">⏰</tg-emoji>",
-    "medal1": "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",
-    "target": "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",
-    "note": "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",
-    "fire": "<tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji>",
-    "warn": "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>",
-    "rocket": "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
-    "tada": "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",
-    "chart": "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",
-    "gift": "<tg-emoji emoji-id=\"5203996991054432397\">🎁</tg-emoji>",
-    "crown": "<tg-emoji emoji-id=\"5217822164362739968\">👑</tg-emoji>",
-    "trophy": "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",
-    "bell": "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",
-    "gem": "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",
-    "mega": "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",
-    "red_circle": "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",
-    "yellow_circle": "<tg-emoji emoji-id=\"5411135756053780000\">🟡</tg-emoji>",
-    "green_circle": "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",
+    "n1": "1️⃣",
+    "n2": "2️⃣",
+    "n3": "3️⃣",
+    "n4": "4️⃣",
+    "n5": "5️⃣",
+    "n6": "6️⃣",
+    "n7": "7️⃣",
+    "n8": "8️⃣",
+    "n9": "9️⃣",
+    "n0": "0️⃣",
+    "cash": "💵",
+    "money": "💵",
+    "link": "🔗",
+    "star": "⭐",
+    "check": "✅",
+    "arrow_r": "➡️",
+    "arrow_l": "⬅️",
+    "cat_up": "🐱🔼",
+    "down": "🔽",
+    "empty": "",
+    "cal": "📅",
+    "medal1": "🥇",
+    "target": "🎯",
+    "note": "📋",
+    "fire": "🔥",
+    "warn": "⚠️",
+    "rocket": "🚀",
+    "tada": "🎉",
+    "chart": "📈",
+    "gift": "🎁",
+    "crown": "👑",
+    "trophy": "🏆",
+    "bell": "🔔",
+    "gem": "💎",
+    "mega": "📢",
+    "red_circle": "🔴",
+    "yellow_circle": "🟡",
+    "green_circle": "🟢",
+}
+
+PREMIUM_CE = {
+    "1️⃣": "<tg-emoji emoji-id=\"6235451228482963747\">1️⃣</tg-emoji>",
+    "2️⃣": "<tg-emoji emoji-id=\"6235429135171193517\">2️⃣</tg-emoji>",
+    "3️⃣": "<tg-emoji emoji-id=\"6235389509802920161\">3️⃣</tg-emoji>",
+    "4️⃣": "<tg-emoji emoji-id=\"6235582323769740174\">4️⃣</tg-emoji>",
+    "5️⃣": "<tg-emoji emoji-id=\"6235449630755130445\">5️⃣</tg-emoji>",
+    "6️⃣": "<tg-emoji emoji-id=\"6237665421563005272\">6️⃣</tg-emoji>",
+    "7️⃣": "<tg-emoji emoji-id=\"6235508931368585981\">7️⃣</tg-emoji>",
+    "8️⃣": "<tg-emoji emoji-id=\"6237790774478505967\">8️⃣</tg-emoji>",
+    "9️⃣": "<tg-emoji emoji-id=\"6235688641390185541\">9️⃣</tg-emoji>",
+    "0️⃣": "<tg-emoji emoji-id=\"6238037528939596392\">0️⃣</tg-emoji>",
+    "💵": "<tg-emoji emoji-id=\"5197434882321567830\">💵</tg-emoji>",
+    "💰": "<tg-emoji emoji-id=\"5197434882321567830\">💰</tg-emoji>",
+    "💸": "<tg-emoji emoji-id=\"5197434882321567830\">💸</tg-emoji>",
+    "🔗": "<tg-emoji emoji-id=\"5271604874419647061\">🔗</tg-emoji>",
+    "⭐": "<tg-emoji emoji-id=\"6005661956931850799\">⭐️</tg-emoji>",
+    "🌟": "<tg-emoji emoji-id=\"6005661956931850799\">🌟</tg-emoji>",
+    "✅": "<tg-emoji emoji-id=\"6296577138615125756\">✅</tg-emoji>",
+    "➡️": "<tg-emoji emoji-id=\"4969851488793788974\">➡️</tg-emoji>",
+    "⬅️": "<tg-emoji emoji-id=\"4972453139463537420\">⬅️</tg-emoji>",
+    "🐱🔼": "<tg-emoji emoji-id=\"6080107204894002709\">🐱🔼</tg-emoji>",
+    "🔽": "<tg-emoji emoji-id=\"5449683594425410231\">🔽</tg-emoji>",
+    "⏰": "<tg-emoji emoji-id=\"6235362644782484636\">⏰</tg-emoji>",
+    "📅": "<tg-emoji emoji-id=\"6235362644782484636\">📅</tg-emoji>",
+    "🥇": "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",
+    "🎯": "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",
+    "💬": "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",
+    "📋": "<tg-emoji emoji-id=\"5443038326535759644\">📋</tg-emoji>",
+    "🔥": "<tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji>",
+    "⚠️": "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>",
+    "🚀": "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
+    "🎉": "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",
+    "📈": "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",
+    "🎁": "<tg-emoji emoji-id=\"5203996991054432397\">🎁</tg-emoji>",
+    "👑": "<tg-emoji emoji-id=\"5217822164362739968\">👑</tg-emoji>",
+    "🏆": "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",
+    "🔔": "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",
+    "💎": "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",
+    "📢": "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",
+    "🔴": "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",
+    "🟡": "<tg-emoji emoji-id=\"5411135756053780000\">🟡</tg-emoji>",
+    "🟢": "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",
 }
 
 # ══════════════════════════════════════════════════════════
@@ -722,38 +766,34 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
             c = item["content"]
             combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
     from datetime import datetime
-    system = f"""Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
+    system = f"""Sen kripto para kazanım fırsatları araştıran DİSİPLİNLİ ve KATI bir analistsin.
 Bugünün tarihi: {datetime.now().strftime('%d %B %Y')}. 
 
-{CE['warn']} KRİTİK TARİH KONTROLÜ - BUNU OKU VE UYGULA:
-1. İncelediğin her kampanyanın 'İlk Başlama' ve 'Son Katılım' tarihlerini KESİN olarak bul.
-2. EĞER bitiş tarihi bugünden (yani {datetime.now().strftime('%d %B %Y')} tarihinden) ÖNCEYSE, O KAMPANYAYI KESİNLİKLE LİSTELEME.
+Aşağıda internetten çekilmiş çeşitli borsa/airdrop kampanyalarının ham metinleri var.
+GÖREVİN: Sadece KURALLARA %100 UYAN fırsatları listelemek. Kurallara uymayanları ACIMASIZCA ELE ve EKRANA YAZMA!
 
-{CE['fire']} DİĞER ANALİZ KRİTERLERİ:
-1. GERÇEK ÖDÜL MİKTARI: "Havuzdan pay" yerine, kullanıcının alacağı kesin net rakamı bul (örn: 20 USDT, 500 TL).
-2. SADECE aktif ve süresi geçmemiş fırsatları listele.
+{CE['warn']} FİLTRELEME KURALLARI (İHLAL EDİLEMEZ):
+1. TARİH KURALI: Bitiş tarihi metinlerde açıkça belirtilmemişse veya {datetime.now().strftime('%d %B %Y')} tarihinden (bugün veya daha eski) geçmemişse KESİNLİKLE LİSTEYE ALMA. "Belirtilmedi" yazanları sil.
+2. ÖDÜL KURALI: Net ve kesin bir kişisel ödül rakamı yoksa (örn: "Ödül havuzdan pay", "Belirsiz", "0 USDT") KESİNLİKLE LİSTEYE ALMA.
+3. YATIRIM KURALI: 1000$ ve üzeri yatırım isteyenleri KESİNLİKLE LİSTEYE ALMA.
+4. LİSTELEME KURALI: Sadece bu testleri geçen kampanyaları listele. Geçemeyenleri asla ekrana basma.
 
-{CE['warn']} KESİN REDDET (LİSTEYE ALMA):
-❌ Bitiş tarihi geçmiş olan BÜTÜN KAMPANYALAR
-❌ Ödül miktarı belirsiz olanlar
-❌ 1000$+ yatırım zorunlu olanlar
-
-FORMAT:
+FORMAT (Uygun Olan Her Kampanya İçin):
 ━━━━━━━━━━━━━━━━━━━━━━
 {CE['check']} <b>[BORSA/PLATFORM ADI]</b>
-{CE['money']} <b>Gerçek Ödül:</b> [RAKAM - örn: 25 USDT / 1000 TL]
+{CE['money']} <b>Gerçek Ödül:</b> [RAKAM - örn: 25 USDT]
 {CE['cal']} <b>Katılım Tarihleri:</b> [İlk Başlama - Son Katılım]
-{CE['target']} <b>Tür:</b> [borsa bonusu / airdrop / görev]
+{CE['target']} <b>Tür:</b> [Borsa Bonusu / Airdrop]
 {CE['note']} <b>Adımlar:</b>
-  {CE['n1']} [adım 1]
-  {CE['n2']} [adım 2]
-  {CE['n3']} [adım 3]
+{CE['n1']} [1. adım]
+{CE['n2']} [2. adım]
+{CE['n3']} [3. adım]
 {CE['star']} <b>Güvenilirlik:</b> [{CE['star']}{CE['star']}{CE['star']}{CE['star']}{CE['star']}]
 {CE['link']} <b>Katılım:</b> [URL]
 
-Türkçe yaz, net ol ve uydurma yapma."""
+Eğer kurallara uyan hiçbir kampanya yoksa sadece "Kriterlere uygun yeni fırsat bulunamadı." yaz."""
 
-    return ai(system, combined_raw[:8000], tokens=4000)
+    return ai(system, combined_raw[:8000], tokens=4000, show_model=True)
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
@@ -851,42 +891,42 @@ def _inject_premium_emojis(text: str) -> str:
     # Güvenli olması adına standart emojileri premium versiyonlarıyla değiştirelim.
     
     _MAP = [
-        ("1️⃣", CE.get("n1", "1️⃣")),
-        ("2️⃣", CE.get("n2", "2️⃣")),
-        ("3️⃣", CE.get("n3", "3️⃣")),
-        ("4️⃣", CE.get("n4", "4️⃣")),
-        ("5️⃣", CE.get("n5", "5️⃣")),
-        ("6️⃣", CE.get("n6", "6️⃣")),
-        ("7️⃣", CE.get("n7", "7️⃣")),
-        ("8️⃣", CE.get("n8", "8️⃣")),
-        ("9️⃣", CE.get("n9", "9️⃣")),
-        ("0️⃣", CE.get("n0", "0️⃣")),
-        ("🔥", CE.get("fire", "🔥")),
-        ("🚀", CE.get("rocket", "🚀")),
-        ("🌟", CE.get("star", "🌟")),
-        ("⭐", CE.get("star", "⭐")),
-        ("💰", CE.get("money", "💰")),
-        ("💵", CE.get("money", "💵")),
-        ("⚠️", CE.get("warn", "⚠️")),
-        ("✅", CE.get("check", "✅")),
-        ("🎁", CE.get("gift", "🎁")),
-        ("👑", CE.get("crown", "👑")),
-        ("📈", CE.get("chart", "📈")),
-        ("🏆", CE.get("trophy", "🏆")),
-        ("🔔", CE.get("bell", "🔔")),
-        ("🎯", CE.get("target", "🎯")),
-        ("🎉", CE.get("tada", "🎉")),
-        ("💎", CE.get("gem", "💎")),
-        ("🥇", CE.get("medal1", "🥇")),
-        ("📋", CE.get("note", "📋")),
-        ("💬", CE.get("note", "💬")),
-        ("📅", CE.get("cal", "📅")),
-        ("⏰", CE.get("cal", "⏰")),
-        ("📢", CE.get("mega", "📢")),
-        ("💸", CE.get("cash", "💸")),
-        ("🔴", CE.get("red_circle", "🔴")),
-        ("🟡", CE.get("yellow_circle", "🟡")),
-        ("🟢", CE.get("green_circle", "🟢")),
+        ("1️⃣", PREMIUM_CE.get("1️⃣")),
+        ("2️⃣", PREMIUM_CE.get("2️⃣")),
+        ("3️⃣", PREMIUM_CE.get("3️⃣")),
+        ("4️⃣", PREMIUM_CE.get("4️⃣")),
+        ("5️⃣", PREMIUM_CE.get("5️⃣")),
+        ("6️⃣", PREMIUM_CE.get("6️⃣")),
+        ("7️⃣", PREMIUM_CE.get("7️⃣")),
+        ("8️⃣", PREMIUM_CE.get("8️⃣")),
+        ("9️⃣", PREMIUM_CE.get("9️⃣")),
+        ("0️⃣", PREMIUM_CE.get("0️⃣")),
+        ("🔥", PREMIUM_CE.get("🔥")),
+        ("🚀", PREMIUM_CE.get("🚀")),
+        ("🌟", PREMIUM_CE.get("🌟")),
+        ("⭐", PREMIUM_CE.get("⭐")),
+        ("💰", PREMIUM_CE.get("💰")),
+        ("💵", PREMIUM_CE.get("💵")),
+        ("⚠️", PREMIUM_CE.get("⚠️")),
+        ("✅", PREMIUM_CE.get("✅")),
+        ("🎁", PREMIUM_CE.get("🎁")),
+        ("👑", PREMIUM_CE.get("👑")),
+        ("📈", PREMIUM_CE.get("📈")),
+        ("🏆", PREMIUM_CE.get("🏆")),
+        ("🔔", PREMIUM_CE.get("🔔")),
+        ("🎯", PREMIUM_CE.get("🎯")),
+        ("🎉", PREMIUM_CE.get("🎉")),
+        ("💎", PREMIUM_CE.get("💎")),
+        ("🥇", PREMIUM_CE.get("🥇")),
+        ("📋", PREMIUM_CE.get("📋")),
+        ("💬", PREMIUM_CE.get("💬")),
+        ("📅", PREMIUM_CE.get("📅")),
+        ("⏰", PREMIUM_CE.get("⏰")),
+        ("📢", PREMIUM_CE.get("📢")),
+        ("💸", PREMIUM_CE.get("💸")),
+        ("🔴", PREMIUM_CE.get("🔴")),
+        ("🟡", PREMIUM_CE.get("🟡")),
+        ("🟢", PREMIUM_CE.get("🟢")),
     ]
     for plain, tg in _MAP:
         # Eğer emoji zaten <tg-emoji> içindeyse replace etmemek için dikkatli olmak lazım
