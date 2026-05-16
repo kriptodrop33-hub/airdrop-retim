@@ -362,7 +362,9 @@ _GROQ_MODELS = [
     "gemma2-9b-it",
 ]
 
-def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75) -> str:
+def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75, show_model: bool = False) -> str:
+    import re
+    from datetime import datetime
     last_err = None
     for model in _GROQ_MODELS:
         try:
@@ -373,19 +375,21 @@ def ai(system: str, user: str, tokens: int = 1800, temp: float = 0.75) -> str:
                 max_tokens=tokens,
                 temperature=temp,
             )
-            return r.choices[0].message.content.strip()
+            ans = r.choices[0].message.content.strip()
+            # DeepSeek modelleri <think> tagı ile akıl yürütme verebilir, HTML hatası olmaması için temizleyelim
+            ans = re.sub(r'<think>.*?</think>', '', ans, flags=re.DOTALL).strip()
+            
+            if show_model:
+                now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+                ans += f"\n\n⚙️ <i>Model: {model}</i>\n🕒 <i>Tarih: {now}</i>"
+                
+            return ans
         except Exception as e:
             last_err = e
-            err_str = str(e).lower()
-            # Kota/rate limit hatası → bir sonraki modeli dene
-            if any(k in err_str for k in ("rate_limit", "quota", "429", "503", "overloaded", "capacity")):
-                logger.warning(f"Groq model {model} kullanılamıyor, sonraki deneniyor: {e}")
-                continue
-            # Başka hata türü (auth, bad request vb.) → direkt çık
-            logger.error(f"Groq hata ({model}): {e}")
-            return "❌ AI yanıt üretemedi."
+            logger.warning(f"Groq model {model} hatası: {e}. Sonraki deneniyor...")
+            continue
     logger.error(f"Tüm Groq modelleri başarısız: {last_err}")
-    return "❌ AI yanıt üretemedi (tüm modeller denemendi)."
+    return "❌ AI yanıt üretemedi (tüm modeller denendi)."
 
 # ══════════════════════════════════════════════════════════
 #  TAVILY — DERIN ARAMA
@@ -902,11 +906,11 @@ def build_post(analysis: str, project_name: str, fmt: str = "long", score: int =
     """fmt: 'long' | 'short' | 'summary'. Skor programatik olarak eklenir."""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
-        raw = ai(get_post_system_short(), prompt, tokens=600, temp=0.3)
+        raw = ai(get_post_system_short(), prompt, tokens=600, temp=0.3, show_model=True)
     elif fmt == "summary":
-        raw = ai(get_post_system_summary(), prompt, tokens=250, temp=0.3)
+        raw = ai(get_post_system_summary(), prompt, tokens=250, temp=0.3, show_model=True)
     else:
-        raw = ai(get_post_system(), prompt, tokens=1400, temp=0.3)
+        raw = ai(get_post_system(), prompt, tokens=1400, temp=0.3, show_model=True)
 
     # Premium emoji inject — AI tagları kaçırmış olsa bile garantile
     raw = _inject_premium_emojis(raw)
