@@ -355,6 +355,7 @@ def admin_only_callback(func):
 #  GROQ — AI ÜRETME
 # ══════════════════════════════════════════════════════════
 _GROQ_MODELS = [
+    "deepseek-r1-distill-llama-70b",
     "llama-3.3-70b-versatile",
     "llama3-70b-8192",
     "llama-3.1-8b-instant",
@@ -581,24 +582,24 @@ def analyze_research(data: dict) -> str:
 Görevin: HAM VERİDEN SADECE VE SADECE GERÇEK, kanıtlanmış bilgileri çıkarmak.
 
 {CE['fire']} KRİTİK ÖNCELİKLER VE KURALLAR:
-1. ASLA UYDURMA YAPMA: Bilgilerde açıkça "100$" yazmıyorsa uydurma. Havuz ödüllerini (örn: 1 Milyon USDT havuz) kişisel ödül gibi yansıtma. Ödül net değilse "Belirsiz" yaz.
+1. ASLA UYDURMA YAPMA: Bilgilerde açıkça "100$" vb. yazmıyorsa uydurma. Toplam havuz ödüllerini (örn: 1 Milyon USDT havuz) kişisel ödül gibi yansıtma!
 2. GERÇEK ÖDÜL MİKTARI: Kullanıcının cebine girecek NET rakamı bul. 
-3. KESİNLİKLE DİKKAT ET: Bugünün tarihi {current_date}. Eğer kampanyanın bitiş tarihi bugünden ÖNCEYSE, uyarılara "SONA ERMİŞ KAMPANYA" yaz.
-4. GEREKSİZ ŞİŞİRME YAPMA: Airdrop detaylarını tamamen dürüstçe aktar.
+3. KESİNLİKLE DİKKAT ET: Bugünün tarihi {current_date}. Kampanyanın bitiş tarihi bugünden ÖNCEYSE, uyarılara "SONA ERMİŞ KAMPANYA" yaz.
+4. RET KURALI (ÖNEMLİ!): Eğer projenin "Son Katılım Tarihi" VEYA "Kişisel Net Ödül Miktarı" kaynak metinde YAZMIYORSA, hiçbir şey üretme ve sadece şunu yaz: "YETERSİZ BİLGİ: Kampanya detayları (tarih/ödül) doğrulanamadı."
 
 FORMAT:
 {CE['check']} PLATFORM: [adı]
 {CE['medal1']} TÜR: [borsa bonusu / airdrop / kampanya]
-{CE['money']} GERÇEK ÖDÜL: [net rakam veya Belirsiz]
+{CE['money']} GERÇEK ÖDÜL: [net rakam]
 {CE['cal']} KATILIM TARİHLERİ: [Başlangıç - Bitiş]
 {CE['note']} ADIMLAR:
-  {CE['n1']} [adım]
-  {CE['n2']} [adım]
+  {CE['n1']} [adım 1]
+  {CE['n2']} [adım 2]
 {CE['target']} TOPLAM: [varsa]
 {CE['star']} GÜVENİLİRLİK: [1-5 yıldız + neden]
 {CE['warn']} UYARI: [KYC / Sona ermiş vb.]
 
-Türkçe yaz. Ödül miktarını kesinlikle uydurma."""
+Türkçe yaz. Eğer bilgi yetersizse sadece YETERSİZ BİLGİ metnini yaz."""
 
     return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2500)
 
@@ -757,37 +758,35 @@ Türkçe yaz, net ol ve uydurma yapma."""
 # ── POST_SYSTEM: Premium emoji'li şablon ────────────────────────────────────
 def get_post_system() -> str:
     """POST şablonunu temiz, anlaşılır ve emojili yapıda döndür."""
-    return f"""Sen KriptoDropTR Telegram kanalı için dürüst ve profesyonel airdrop postları yazan bir editörsün.
-HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak.
+    return f"""Sen KriptoDropTR Telegram kanalı için dürüst ve profesyonel airdrop postları yazan, KURALLARA KESİN UYAN bir robotsun.
+HTML parse_mode kullanılıyor. SADECE HTML ŞABLONU ÇIKTISI VER, YORUM YAPMA.
 
-{CE['fire']} <b>YAZIM KURALLARI:</b>
-1. KAMPANYA VE ÖDÜL: Asla uydurma kampanyalar veya şişirilmiş ödüller KULLANMA. Kullanıcının cebine girecek olan kanıtlanmış NET ödülü yaz. Abartma!
-2. TARİHLER: Kampanyanın son katılım tarihini net belirt.
-3. ADIMLAR: Sadece yapılması gereken gerçek adımları (1️⃣, 2️⃣ vb.) sade ve anlaşılır bir dille listele.
-4. ŞABLONA BİREBİR UY: Aşağıdaki yapıyı aynen kullan.
+{CE['fire']} YAZIM KURALLARI (İHLAL EDİLEMEZ):
+1. ÖDÜL KURALI: Toplam havuz miktarlarını (örn: $19,800 havuz) KİŞİSEL ÖDÜL GİBİ YAZMA. Kullanıcının KESİN ALACAĞI net bir ödül yoksa ödülü abartma.
+2. EMOJİ KULLANIMI: Adımların başında MUHAKKAK {CE['n1']}, {CE['n2']}, {CE['n3']} kullanacaksın. Asla düz liste yapma veya nokta, tire işareti kullanma!
+3. ŞABLON DIŞINA ÇIKMA: Alt kısımdaki şablonun virgülüne kadar aynısını üret. Şablon dışı bir cümle ekleme.
 
-ŞABLON:
+ŞABLON (AŞAĞIDAKİ YAPIYI BİREBİR KOPYALA):
 
 🎁 <b>[PLATFORM ADI] Yeni Üye Airdrop 🎉</b>
 
-🏆 <b>[PLATFORM ADI] Yeni Üyeler için [GERÇEK ÖDÜL MİKTARI] kazanma fırsatı 🧐</b>
+🏆 <b>[PLATFORM ADI] Yeni Üyeler için [NET KİŞİSEL ÖDÜL MİKTARI] kazanma fırsatı 🧐</b>
 
 📋 <b>YAPMAN GEREKENLER:</b>
 
-{CE['n1']} Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)
-{CE['n2']} [adım 2]
-{CE['n3']} [adım 3]
-{CE['n4']} [adım 4]
+{CE['n1']} [1. Adım: Örn. Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)]
+{CE['n2']} [2. Adım açıklaması]
+{CE['n3']} [3. Adım açıklaması]
 
 ➡️ Hemen Kaydol: ⚡️ TIKLA ⚡️
 ➡️ Etkinlik sayfası: ⚡️ TIKLA ⚡️
 ---------------------------
 Görev zorluğu: [Kolay / Orta / Zor]
-Ödül miktarı: [Gerçek Miktar]
+Ödül miktarı: [Gerçek Kişisel Miktar]
 Airdrop puanı: ⭐⭐⭐⭐⭐
 
-📅 Son gün: [Tarih]
-NOT: [varsa önemli not, örn: üye olduktan sonra 7 gün içinde görevleri tamamlamalısınız.]
+📅 Son gün: [Son Katılım Tarihi]
+NOT: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
 
 🔥 Daha fazla airdrop için duyuru kanalını pinle 📌
 
@@ -1270,9 +1269,9 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
     # Analiz başarısız → devam etme, kullanıcıyı bilgilendir
     if analysis.startswith("❌"):
         await msg.edit_text(
-            f"⚠️ <b>Groq API şu an yanıt veremiyor.</b>\n\n"
+            f"⚠️ <b>API şu an yanıt veremiyor.</b>\n\n"
             f"Tüm modeller denendi, yanıt alınamadı.\n"
-            f"• Groq günlük kotanızı kontrol edin\n"
+            f"• Günlük kotanızı kontrol edin\n"
             f"• 1-2 dakika bekleyip tekrar deneyin\n\n"
             f"<i>Proje: {project_name} | Skor: {badge}</i>",
             parse_mode=ParseMode.HTML,
@@ -1280,6 +1279,14 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
                 InlineKeyboardButton("🔄 Tekrar Dene", callback_data="new_research"),
                 InlineKeyboardButton("🏠 Ana Menü", callback_data="home"),
             ]]),
+        )
+        return
+
+    if "YETERSİZ BİLGİ" in analysis.upper():
+        await msg.edit_text(
+            f"❌ <b>Araştırma Reddedildi:</b>\n\n{analysis}\n\n<i>Eksik veya uydurma/abartılı bilgi riski taşıdığı için post oluşturulmadı. Bu projede net bir kişisel ödül ve bitiş tarihi bulunamadı.</i>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=main_menu()
         )
         return
 
