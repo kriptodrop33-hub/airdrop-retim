@@ -263,11 +263,11 @@ SADECE JSON döndür, başka hiçbir şey yazma."""
 def format_score_badge(score: int, verdict: str) -> str:
     """Skora göre rozet metni döndür."""
     if score >= 75:
-        return f"{CE['green_circle']} {verdict} ({score}/100)"
+        return f"🟢 {verdict} ({score}/100)"
     elif score >= 50:
         return f"🟡 {verdict} ({score}/100)"
     else:
-        return f"{CE['red_circle']} {verdict} ({score}/100)"
+        return f"🔴 {verdict} ({score}/100)"
 
 groq_client   = Groq(api_key=GROQ_API_KEY)
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
@@ -276,33 +276,6 @@ tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 # HTML modunda: <tg-emoji emoji-id="ID">fallback</tg-emoji>
 # Bot'un Premium aboneliği varsa animasyonlu görünür, yoksa fallback emoji görünür
 CE = {
-    "fire":    "<tg-emoji emoji-id=\"5438571934210082705\">🔥</tg-emoji>",
-    "diamond": "<tg-emoji emoji-id=\"6001287064589439895\">💎</tg-emoji>",
-    "rocket":  "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
-    "star":    "<tg-emoji emoji-id=\"6005661956931850799\">⭐️</tg-emoji>",
-    "money":   "<tg-emoji emoji-id=\"5807690868261394864\">💰</tg-emoji>",
-    "money_coin": "<tg-emoji emoji-id=\"6172341082114757199\">🪙</tg-emoji>",
-    "warn":    "<tg-emoji emoji-id=\"6298555228752971886\">⚠️</tg-emoji>",
-    "check":   "<tg-emoji emoji-id=\"5850233438451274824\">✅</tg-emoji>",
-    "check2":  "<tg-emoji emoji-id=\"5807953943598209274\">✔️</tg-emoji>",
-    "gift":    "<tg-emoji emoji-id=\"5203996991054432397\">🎁</tg-emoji>",
-    "crown":   "<tg-emoji emoji-id=\"5217822164362739968\">👑</tg-emoji>",
-    "chart":   "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",
-    "trophy":  "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",
-    "bell":    "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",
-    "pin":     "<tg-emoji emoji-id=\"5796378469864577620\">📌</tg-emoji>",
-    "tada":    "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",
-    "gem":     "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",
-    "medal1":  "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",
-    "note":    "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",
-    "cal":     "<tg-emoji emoji-id=\"5764932574749136377\">⏱</tg-emoji>",
-    "mega":    "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",
-    "arrow":   "<tg-emoji emoji-id=\"6296341890371422476\">➡️</tg-emoji>",
-    "cash":    "<tg-emoji emoji-id=\"5323261730283863478\">💵</tg-emoji>",
-    "red_circle": "<tg-emoji emoji-id=\"5197369495739455200\">🔴</tg-emoji>",
-    "green_circle": "<tg-emoji emoji-id=\"6219549292458150316\">🟢</tg-emoji>",
-    "link":    "<tg-emoji emoji-id=\"5197371802136892976\">🔗</tg-emoji>",
-    "target":  "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",
     "n1": "<tg-emoji emoji-id=\"6235451228482963747\">1️⃣</tg-emoji>",
     "n2": "<tg-emoji emoji-id=\"6235429135171193517\">2️⃣</tg-emoji>",
     "n3": "<tg-emoji emoji-id=\"6235389509802920161\">3️⃣</tg-emoji>",
@@ -313,6 +286,25 @@ CE = {
     "n8": "<tg-emoji emoji-id=\"6237790774478505967\">8️⃣</tg-emoji>",
     "n9": "<tg-emoji emoji-id=\"6235688641390185541\">9️⃣</tg-emoji>",
     "n0": "<tg-emoji emoji-id=\"6238037528939596392\">0️⃣</tg-emoji>",
+    "cash": "<tg-emoji emoji-id=\"5197434882321567830\">💵</tg-emoji>",
+    "money": "<tg-emoji emoji-id=\"5197434882321567830\">💵</tg-emoji>",
+    "link": "<tg-emoji emoji-id=\"5271604874419647061\">🔗</tg-emoji>",
+    "star": "<tg-emoji emoji-id=\"6005661956931850799\">⭐️</tg-emoji>",
+    "check": "<tg-emoji emoji-id=\"6296577138615125756\">✅</tg-emoji>",
+    "arrow_r": "<tg-emoji emoji-id=\"4969851488793788974\">➡️</tg-emoji>",
+    "arrow_l": "<tg-emoji emoji-id=\"4972453139463537420\">⬅️</tg-emoji>",
+    "cat_up": "<tg-emoji emoji-id=\"6080107204894002709\">🐱🔼</tg-emoji>",
+    "down": "<tg-emoji emoji-id=\"5449683594425410231\">🔽</tg-emoji>",
+    "empty": "<tg-emoji emoji-id=\"5447183459602669338\"></tg-emoji>",
+    "cal": "<tg-emoji emoji-id=\"6235362644782484636\">⏰</tg-emoji>",
+    "medal1": "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",
+    "target": "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",
+    "note": "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",
+    "fire": "<tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji>",
+    "warn": "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>",
+    "rocket": "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
+    "tada": "<tg-emoji emoji-id=\"5461151367559141950\">🎉</tg-emoji>",
+    "chart": "<tg-emoji emoji-id=\"5244837092042750681\">📈</tg-emoji>",
 }
 
 # ══════════════════════════════════════════════════════════
@@ -574,28 +566,29 @@ def research_airdrop_by_url(url: str) -> dict:
 
 def analyze_research(data: dict) -> str:
     """AI ile araştırma verisini analiz et — sadece belgeli bilgileri yaz."""
+    from datetime import datetime
+    current_date = datetime.now().strftime('%d %B %Y')
     system = f"""Sen deneyimli bir kripto kazanım fırsatı araştırmacısısın.
 Görevin: HAM VERİDEN SADECE gerçek, belgeli bilgileri çıkarmak.
 
-{CE['fire']} KRİTİK ÖNCELİKLER:
+{CE['fire']} KRİTİK ÖNCELİKLER - TARİH KONTROLÜ:
 1. GERÇEK ÖDÜL MİKTARI: Kullanıcının cebine girecek net rakamı bul (örn: "20 USDT çekilebilir", "500 TL bonus").
-2. TARİHLER: Kampanyanın 'Başlangıç' ve 'Bitiş' tarihlerini kesin olarak tespit et.
-3. SADECE ham veride geçen bilgileri yaz — asla tahmin/uydurma yapma.
-4. Ham veride yoksa: "Bulunamadı" yaz.
+2. TARİHLER: Kampanyanın 'İlk Başlama' ve 'Son Katılım' tarihlerini kesin olarak tespit et.
+3. KESİNLİKLE DİKKAT ET: Bugünün tarihi {current_date}. Eğer kampanyanın bitiş tarihi (son katılım tarihi) bugünden ÖNCEYSE (örneğin bitiş tarihi dündü veya geçen aydı), uyarılara BÜYÜK HARFLERLE "SONA ERMİŞ KAMPANYA" yaz.
 
 FORMAT:
-{CE['pin']} PLATFORM: [adı]
-{CE['gift']} TÜR: [borsa bonusu / airdrop / kampanya]
+{CE['check']} PLATFORM: [adı]
+{CE['medal1']} TÜR: [borsa bonusu / airdrop / kampanya]
 {CE['money']} GERÇEK ÖDÜL: [kaynaktaki EXACT rakam ve çekilebilirlik durumu]
-{CE['cal']} KATILIM TARİHLERİ: [Başlangıç - Bitiş tarihleri]
+{CE['cal']} KATILIM TARİHLERİ: [İlk Başlama - Son Katılım tarihleri]
 {CE['note']} ADIMLAR:
   {CE['n1']} [adım]
   {CE['n2']} [adım]
 {CE['target']} TOPLAM: [varsa]
 {CE['star']} GÜVENİLİRLİK: [1-5 yıldız + neden]
-{CE['warn']} UYARI: [KYC / min yatırım / SONA ERMİŞ OLABİLİR]
+{CE['warn']} UYARI: [KYC / min yatırım / SONA ERMİŞ KAMPANYA]
 
-Türkçe yaz. Ödül ve tarih konularında çok titiz ol."""
+Türkçe yaz. Ödül ve tarih konularında çok titiz ol. Tarihi geçmiş hiçbir kampanyayı aktifmiş gibi gösterme."""
 
     return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2500)
 
@@ -605,18 +598,20 @@ Türkçe yaz. Ödül ve tarih konularında çok titiz ol."""
 # Borsa kayıt bonusu + kampanya ağırlıklı, airdrop destekli
 OPPORTUNITY_QUERIES = [
     # Borsa yeni kullanıcı bonusu — Türkçe borsalar dahil
-    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü Mayıs 2026 USDT TL çekilebilir aktif"),
-    ("bonus", "crypto exchange sign up bonus withdrawable reward 2026 active dates"),
-    ("bonus", "exchange welcome bonus reward pool distribution date May 2026"),
+    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü Mayıs 2026 USDT TL çekilebilir aktif başlama bitiş tarihi"),
+    ("bonus", "crypto exchange sign up bonus withdrawable reward 2026 active start end dates"),
+    ("bonus", "exchange welcome bonus reward pool distribution start end date May 2026"),
+    ("bonus", "borsa kayıt kampanyası hediye Mayıs 2026 aktif site:cointr.com OR site:paribu.com OR site:btcturk.com"),
     # Airdrop detaylı arama
-    ("airdrop", "new crypto airdrop distribution date reward amount confirmed 2026"),
+    ("airdrop", "new crypto airdrop distribution date reward amount confirmed 2026 start end"),
     ("airdrop", "airdrop claim date start end time tutorial May 2026 active"),
     # Referral / davet kampanyası
     ("referral", "crypto referral program reward per friend withdrawable 2026 dates"),
+    ("referral", "kripto borsa arkadaş davet et kazan referral ödülü Mayıs 2026 bitiş tarihi"),
     # İşlem / trading kampanyası
-    ("kampanya", "crypto exchange trading competition prize pool distribution 2026 active"),
+    ("kampanya", "crypto exchange trading competition prize pool distribution 2026 active dates"),
     # Telegram / sosyal görev ödülü
-    ("sosyal", "telegram crypto bot airdrop reward amount verified 2026 dates"),
+    ("sosyal", "telegram crypto bot airdrop reward amount verified 2026 start end dates"),
 ]
 
 
@@ -713,30 +708,32 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
             combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
     from datetime import datetime
     system = f"""Sen kripto para kazanım fırsatları araştıran uzman bir analistsin.
-Bugünün tarihi: {datetime.now().strftime('%d %B %Y')}.
+Bugünün tarihi: {datetime.now().strftime('%d %B %Y')}. 
 
-{CE['fire']} ANALİZ KRİTERLERİ:
-1. GERÇEK ÖDÜL MİKTARI: "Havuzdan pay" yerine, bir kişinin alacağı net rakamı bul (örn: 20 USDT, 500 TL).
-2. KATILIM TARİHLERİ: Kampanya ne zaman başladı? Ne zaman bitiyor? (Örn: 01.05.2026 - 15.05.2026).
-3. SADECE aktif ve süresi geçmemiş fırsatları listele.
+{CE['warn']} KRİTİK TARİH KONTROLÜ - BUNU OKU VE UYGULA:
+1. İncelediğin her kampanyanın 'İlk Başlama' ve 'Son Katılım' tarihlerini KESİN olarak bul.
+2. EĞER bitiş tarihi bugünden (yani {datetime.now().strftime('%d %B %Y')} tarihinden) ÖNCEYSE, O KAMPANYAYI KESİNLİKLE LİSTELEME.
 
-{CE['warn']} KESİN REDDET:
-❌ Sona erme tarihi bugünden önce olanlar
+{CE['fire']} DİĞER ANALİZ KRİTERLERİ:
+1. GERÇEK ÖDÜL MİKTARI: "Havuzdan pay" yerine, kullanıcının alacağı kesin net rakamı bul (örn: 20 USDT, 500 TL).
+2. SADECE aktif ve süresi geçmemiş fırsatları listele.
+
+{CE['warn']} KESİN REDDET (LİSTEYE ALMA):
+❌ Bitiş tarihi geçmiş olan BÜTÜN KAMPANYALAR
 ❌ Ödül miktarı belirsiz olanlar
 ❌ 1000$+ yatırım zorunlu olanlar
-❌ Scam/fraud şüphesi olanlar
 
 FORMAT:
 ━━━━━━━━━━━━━━━━━━━━━━
-{CE['medal1']} <b>[BORSA/PLATFORM ADI]</b>
+{CE['check']} <b>[BORSA/PLATFORM ADI]</b>
 {CE['money']} <b>Gerçek Ödül:</b> [RAKAM - örn: 25 USDT / 1000 TL]
-{CE['cal']} <b>Katılım Tarihleri:</b> [Başlangıç - Bitiş]
+{CE['cal']} <b>Katılım Tarihleri:</b> [İlk Başlama - Son Katılım]
 {CE['target']} <b>Tür:</b> [borsa bonusu / airdrop / görev]
 {CE['note']} <b>Adımlar:</b>
   {CE['n1']} [adım 1]
   {CE['n2']} [adım 2]
   {CE['n3']} [adım 3]
-{CE['star']} <b>Güvenilirlik:</b> [⭐⭐⭐⭐⭐]
+{CE['star']} <b>Güvenilirlik:</b> [{CE['star']}{CE['star']}{CE['star']}{CE['star']}{CE['star']}]
 {CE['link']} <b>Katılım:</b> [URL]
 
 Türkçe yaz, net ol ve uydurma yapma."""
@@ -756,7 +753,7 @@ HTML parse_mode kullanılıyor. Çıktı SADECE HTML olacak.
 {CE['fire']} <b>YAZIM KURALLARI:</b>
 1. ÖDÜL: En başa ve dikkat çekici yaz (Gerçek çekilebilir miktar).
 2. TARİHLER: Kampanyanın başlangıç ve bitiş tarihlerini mutlaka belirt.
-3. ADIMLAR: {CE['n1']}, {CE['n2']} gibi Premium numaraları kullan.
+3. ADIMLAR: {CE['n1']}, {CE['n2']} gibi numaraları kullan.
 4. LİNK: [🔗 TIKLA 🖊] formatını kullan.
 
 ŞABLON:
@@ -818,7 +815,7 @@ def _build_prompt(analysis: str, project_name: str) -> str:
         f"=== ARAŞTIRMA ANALİZİ ===\n{analysis}\n\n"
         f"=== KESİN KURALLAR ===\n"
         f"1. GERÇEK ÖDÜL: Sadece kesin alacağı ödülü yaz (örn: '20 USDT'). Belirsiz/çekiliş ödüllerini yazma.\n"
-        f"2. TARİHLER: Kampanya başlangıç ve bitiş tarihlerini tespitle yaz. Yoksa 'Belirtilmemiş' yaz.\n"
+        f"2. TARİHLER: Kampanya başlangıç ve bitiş tarihlerini kesin olarak yaz. Eğer bitiş tarihi {datetime.now().strftime('%d.%m.%Y')} tarihinden ÖNCEYSE, uyarılara 'SONA ERMİŞ KAMPANYA' ekle.\n"
         f"3. Referral kodu, promo kodu, davet kodu YAZMA\n"
         f"4. Bir satırı dolduracak bilgi yoksa o satırı komple SİL\n"
         f"5. Adımları analizden al, kendin adım uydurma\n"
