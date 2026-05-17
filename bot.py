@@ -334,16 +334,16 @@ PREMIUM_CE = {
     "⭐": "<tg-emoji emoji-id=\"6005661956931850799\">⭐️</tg-emoji>",
     "🌟": "<tg-emoji emoji-id=\"6005661956931850799\">🌟</tg-emoji>",
     "✅": "<tg-emoji emoji-id=\"6296577138615125756\">✅</tg-emoji>",
-    "➡️": "<tg-emoji emoji-id=\"4969851488793788974\">➡️</tg-emoji>",
+    "➡️": "<tg-emoji emoji-id=\"5215720576735255650\">➡️</tg-emoji>",
     "⬅️": "<tg-emoji emoji-id=\"4972453139463537420\">⬅️</tg-emoji>",
-    "🐱🔼": "<tg-emoji emoji-id=\"6080107204894002709\">🐱🔼</tg-emoji>",
+    "🔼": "<tg-emoji emoji-id=\"6080107204894002709\">🔼</tg-emoji>",
     "🔽": "<tg-emoji emoji-id=\"5449683594425410231\">🔽</tg-emoji>",
     "⏰": "<tg-emoji emoji-id=\"6235362644782484636\">⏰</tg-emoji>",
     "📅": "<tg-emoji emoji-id=\"6235362644782484636\">📅</tg-emoji>",
     "🥇": "<tg-emoji emoji-id=\"5440539497383087970\">🥇</tg-emoji>",
     "🎯": "<tg-emoji emoji-id=\"5461009483314517035\">🎯</tg-emoji>",
     "💬": "<tg-emoji emoji-id=\"5443038326535759644\">💬</tg-emoji>",
-    "📋": "<tg-emoji emoji-id=\"5443038326535759644\">📋</tg-emoji>",
+    "📋": "<tg-emoji emoji-id=\"5850233438451274824\">📋</tg-emoji>",
     "🔥": "<tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji>",
     "⚠️": "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>",
     "🚀": "<tg-emoji emoji-id=\"5188481279963715781\">🚀</tg-emoji>",
@@ -354,7 +354,7 @@ PREMIUM_CE = {
     "🏆": "<tg-emoji emoji-id=\"5188344996356448758\">🏆</tg-emoji>",
     "🔔": "<tg-emoji emoji-id=\"5458603043203327669\">🔔</tg-emoji>",
     "💎": "<tg-emoji emoji-id=\"5213240855892073022\">💠</tg-emoji>",
-    "📢": "<tg-emoji emoji-id=\"6235691325744745133\">📢</tg-emoji>",
+    "📢": "<tg-emoji emoji-id=\"4967957395331351254\">📢</tg-emoji>",
     "🔴": "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",
     "🟡": "<tg-emoji emoji-id=\"5411135756053780000\">🟡</tg-emoji>",
     "🟢": "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",
@@ -941,16 +941,16 @@ HTML parse_mode kullanılıyor. SADECE HTML ŞABLONU ÇIKTISI VER, YORUM YAPMA.
 
 🏆 <b>[PLATFORM ADI] Yeni Üyeler için [NET KİŞİSEL ÖDÜL MİKTARI] bonus kazanma fırsatı 😊</b>
 
-🪙 <b>YAPMAN GEREKENLER:</b>
+📋 <b>YAPMAN GEREKENLER:</b>
 
 {CE['n1']} [1. Adım: Kısa ve net açıklama]
 {CE['n2']} [2. Adım: Kısa ve net açıklama]
 {CE['n3']} [3. Adım: Kısa ve net açıklama]
 {CE['n4']} [4. Adım varsa: Kısa ve net açıklama]
-
+━━━━━━━━━━━━━━━━━━━━
 ➡️ <b>Hemen Kaydol:</b> 🔗 TIKLA 🔗
 ➡️ <b>Etkinlik sayfası:</b> 🔗 TIKLA 🔗
-
+━━━━━━━━━━━━━━━━━━━━
 Görev zorluğu: [Kolay / Orta / Zor]
 Ödül miktarı: [Gerçek Kişisel Miktar]
 Airdrop puanı: ⭐ ⭐ ⭐ ⭐ ⭐
@@ -959,7 +959,7 @@ Airdrop puanı: ⭐ ⭐ ⭐ ⭐ ⭐
 NOT: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
 
 🔥 Daha fazla airdrop için duyuru kanalını pinle 🎉
-
+━━━━━━━━━━━━━━━━━━━━
 📢 @kriptodropduyuru
 🎁 @kriptodroptr"""
 
