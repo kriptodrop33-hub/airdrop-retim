@@ -653,23 +653,24 @@ Görevin: HAM VERİDEN SADECE VE SADECE GERÇEK, kanıtlanmış bilgileri çıka
 
 {CE['fire']} KRİTİK ÖNCELİKLER VE KURALLAR:
 1. ASLA UYDURMA YAPMA: Bilgilerde açıkça "100$" vb. yazmıyorsa uydurma. Toplam havuz ödüllerini (örn: 1 Milyon USDT havuz) kişisel ödül gibi yansıtma!
-2. GERÇEK ÖDÜL MİKTARI: Kullanıcının cebine girecek NET rakamı bul. 
-3. KESİNLİKLE DİKKAT ET: Bugünün tarihi {current_date}. Kampanyanın bitiş tarihi bugünden ÖNCEYSE, uyarılara "SONA ERMİŞ KAMPANYA" yaz.
-4. RET KURALI (ÖNEMLİ!): Eğer projenin "Son Katılım Tarihi" VEYA "Kişisel Net Ödül Miktarı" kaynak metinde YAZMIYORSA, hiçbir şey üretme ve sadece şunu yaz: "YETERSİZ BİLGİ: Kampanya detayları (tarih/ödül) doğrulanamadı."
+2. GERÇEK ÖDÜL MİKTARI: Kullanıcının cebine girecek NET rakamı bul. Ödül aralığı varsa aralığı yaz (örn: "20-1000 USDT"). Kesin rakam yoksa "Belirtilmemiş" yaz.
+3. TARİH: Bugünün tarihi {current_date}. Kampanya bitiş tarihi bugünden ÖNCEYSE "SONA ERMİŞ KAMPANYA" yaz. Tarih bulunamazsa "Belirtilmemiş" yaz — bu REDDETme sebebi değildir.
+4. RET KURALI (SADECE BU DURUMDA): Proje hakkında hiçbir bilgi bulunamadıysa (kayıt linki yok, ödül türü yok, adımlar yok) SADECE O ZAMAN şunu yaz: "YETERSİZ BİLGİ: Bu proje hakkında hiçbir kampanya bilgisi doğrulanamadı." Tarih veya miktar yoksa RET ETME, "Belirtilmemiş" yaz ve devam et.
+5. SÜREGELEN KAMPANYALAR: Bazı borsaların (MEXC, Bitget, OKX vb.) sürekli devam eden yeni üye bonusu vardır ve son tarihleri olmayabilir. Bu normaldir, reddetme.
 
 FORMAT:
 {CE['check']} PLATFORM: [adı]
 {CE['medal1']} TÜR: [borsa bonusu / airdrop / kampanya]
-{CE['money']} GERÇEK ÖDÜL: [net rakam]
-{CE['cal']} KATILIM TARİHLERİ: [Başlangıç - Bitiş]
+{CE['money']} GERÇEK ÖDÜL: [net rakam veya aralık, yoksa "Belirtilmemiş"]
+{CE['cal']} KATILIM TARİHLERİ: [Başlangıç - Bitiş, bitiş yoksa "Süregelen Kampanya"]
 {CE['note']} ADIMLAR:
   {CE['n1']} [adım 1]
   {CE['n2']} [adım 2]
 {CE['target']} TOPLAM: [varsa]
 {CE['star']} GÜVENİLİRLİK: [1-5 yıldız + neden]
-{CE['warn']} UYARI: [KYC / Sona ermiş vb.]
+{CE['warn']} UYARI: [KYC / Sona ermiş / Koşullar vb.]
 
-Türkçe yaz. Eğer bilgi yetersizse sadece YETERSİZ BİLGİ metnini yaz."""
+Türkçe yaz. Sadece hiçbir bilgi yoksa YETERSİZ BİLGİ yaz."""
 
     return ai(system, f"Proje: {data['name']}\n\n{data['raw']}", tokens=2500)
 
@@ -1495,10 +1496,19 @@ async def _do_research(update: Update, context: ContextTypes.DEFAULT_TYPE, input
         return
 
     if "YETERSİZ BİLGİ" in analysis.upper():
+        # Veriyi kaydet — kullanıcı yine de post isteyebilir
+        context.user_data["last_analysis"] = analysis
+        context.user_data["last_project"]  = project_name
         await msg.edit_text(
-            f"❌ <b>Araştırma Reddedildi:</b>\n\n{analysis}\n\n<i>Eksik veya uydurma/abartılı bilgi riski taşıdığı için post oluşturulmadı. Bu projede net bir kişisel ödül ve bitiş tarihi bulunamadı.</i>",
+            f"⚠️ <b>Araştırma Uyarısı — {project_name}</b>\n\n"
+            f"{analysis}\n\n"
+            f"<i>Bot yeterli kampanya detayı bulamadı. Yine de post oluşturmayı deneyebilir veya farklı arama yapabilirsin.</i>",
             parse_mode=ParseMode.HTML,
-            reply_markup=main_menu()
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⚡ Yine de Post Oluştur", callback_data="force_post")],
+                [InlineKeyboardButton("🔄 Yeniden Araştır",      callback_data="new_research"),
+                 InlineKeyboardButton("🏠 Ana Menü",              callback_data="home")],
+            ]),
         )
         return
 
@@ -2053,6 +2063,30 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text_msg, parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]),
         )
+
+    elif data == "force_post":
+        analysis = context.user_data.get("last_analysis", "")
+        project  = context.user_data.get("last_project", "Bilinmiyor")
+        score_data = context.user_data.get("last_score", {})
+        score   = score_data.get("score") if score_data else None
+        verdict = score_data.get("verdict") if score_data else None
+        await q.answer("⚡ Post oluşturuluyor...")
+        msg2 = await q.message.reply_text("✍️ <b>Post yazılıyor (mevcut verilerle)...</b>", parse_mode=ParseMode.HTML)
+        # Analiz yoksa ham araştırma notunu kullan
+        if not analysis or "YETERSİZ BİLGİ" in analysis.upper():
+            analysis = f"Platform: {project}\nBilgiler kısmi — mevcut verilerle post oluştur. Bilinmeyen alanları 'Belirtilmemiş' yaz."
+        post = await asyncio.to_thread(build_post, analysis, project, "long", score, verdict)
+        context.user_data["last_post"]  = post
+        context.user_data["final_post"] = post
+        context.user_data["has_link"]   = False
+        context.user_data["post_fmt"]   = "long"
+        save_post_archive(project, post, "long")
+        preview = f"📣 <b>HAZIRLANAN POST:</b>\n\n{post}"
+        if len(preview) > 4096: preview = preview[:4086] + "..."
+        try:
+            await msg2.edit_text(preview, parse_mode=ParseMode.HTML, reply_markup=post_actions(has_link=False, fmt="long"))
+        except Exception:
+            await msg2.edit_text(re.sub(r'<[^>]+>', '', preview), reply_markup=post_actions(has_link=False, fmt="long"))
 
     elif data == "new_research":
         context.user_data["waiting_for"] = None
