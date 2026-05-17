@@ -358,6 +358,7 @@ PREMIUM_CE = {
     "🔴": "<tg-emoji emoji-id=\"5411225014148014586\">🔴</tg-emoji>",
     "🟡": "<tg-emoji emoji-id=\"5411135756053780000\">🟡</tg-emoji>",
     "🟢": "<tg-emoji emoji-id=\"5416081784641168838\">🟢</tg-emoji>",
+    "🎮": "<tg-emoji emoji-id=\"5382131713936797012\">🎮</tg-emoji>",
 }
 
 # ══════════════════════════════════════════════════════════
@@ -710,6 +711,14 @@ OPPORTUNITY_QUERIES = [
     ("sosyal", "twitter crypto reward"),
     ("sosyal", "discord crypto bonus"),
     
+    # ===== TELEGRAM OYUN / MINI APP =====
+    ("oyun", "telegram mini game TON airdrop 2026"),
+    ("oyun", "telegram tap to earn crypto game reward"),
+    ("oyun", "telegram bot game play earn token"),
+    ("oyun", "telegram oyun airdrop TON kripto kazan"),
+    ("oyun", "telegram mini app play to earn 2026"),
+    ("oyun", "tap earn telegram game new 2026"),
+    
     # ===== DUYURU / HABER SAYFASI (YENİ) =====
     ("bonus", "cryptocurrency exchange announcement May 2026"),
     ("airdrop", "crypto airdrop news announcement"),
@@ -726,6 +735,7 @@ CATEGORY_DEFS = {
     "kampanya": ("🏆 Kampanya",       ["kampanya"]),
     "sosyal":   ("📱 Sosyal Görev",   ["sosyal"]),
     "airdrop":  ("🪂 Airdrop",        ["airdrop"]),
+    "oyun":     ("🎮 Telegram Oyun",  ["oyun"]),
 }
 
 
@@ -826,6 +836,7 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
             "kampanya": "🏆 İŞLEM / TRADİNG KAMPANYASI",
             "sosyal":   "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
             "airdrop":  "🪂 AIRDROP",
+            "oyun":     "🎮 TELEGRAM OYUN / MINI APP ÖDÜLÜ",
         }
 
         combined_raw = ""
@@ -921,34 +932,35 @@ HTML parse_mode kullanılıyor. SADECE HTML ŞABLONU ÇIKTISI VER, YORUM YAPMA.
 1. ÖDÜL KURALI: Toplam havuz miktarlarını (örn: $19,800 havuz) KİŞİSEL ÖDÜL GİBİ YAZMA. Kullanıcının KESİN ALACAĞI net bir ödül yoksa ödülü abartma.
 2. EMOJİ KULLANIMI: Adımların başında MUHAKKAK {CE['n1']}, {CE['n2']}, {CE['n3']}, {CE['n4']} kullanacaksın. Asla düz liste yapma veya nokta, tire işareti kullanma!
 3. ŞABLON DIŞINA ÇIKMA: Alt kısımdaki şablonun virgülüne kadar aynısını üret. Şablon dışı bir cümle ekleme.
+4. YILDIZ ARASI BOŞLUK: Airdrop puanı satırında yıldızlar arasına boşluk koy: ⭐ ⭐ ⭐ ⭐ ⭐
 
-ŞABLON (AŞAĞIDAKİ YAPIYI BİREBİR KOPYALA - Image 3 formatı):
+ŞABLON (AŞAĞIDAKİ YAPIYI BİREBİR KOPYALA):
 
-🏢 <b>[PLATFORM ADI] Yeni İiye Airdrop 🎉</b>
+🎁 <b>[PLATFORM ADI] Yeni Üye Airdrop 🎉</b>
 
 🏆 <b>[PLATFORM ADI] Yeni Üyeler için [NET KİŞİSEL ÖDÜL MİKTARI] bonus kazanma fırsatı 😊</b>
 
-👤 <b>YAPMAN GEREKENLER:</b>
+🪙 <b>YAPMAN GEREKENLER:</b>
 
 {CE['n1']} [1. Adım: Kısa ve net açıklama]
 {CE['n2']} [2. Adım: Kısa ve net açıklama]
 {CE['n3']} [3. Adım: Kısa ve net açıklama]
 {CE['n4']} [4. Adım varsa: Kısa ve net açıklama]
 
-🏠 <b>Hemen Kaydol:</b> 🔗 TIKLA 🔗
-🏠 <b>Etkinlik sayfası:</b> 🔗 TIKLA 🔗
-_________________
+➡️ <b>Hemen Kaydol:</b> 🔗 TIKLA 🔗
+➡️ <b>Etkinlik sayfası:</b> 🔗 TIKLA 🔗
+
 Görev zorluğu: [Kolay / Orta / Zor]
-Ödül miktan: [Gerçek Kişisel Miktar]
-Airdrop puanı: [Yıldızları böyle yazacaksın ⭐⭐⭐⭐⭐]
+Ödül miktarı: [Gerçek Kişisel Miktar]
+Airdrop puanı: ⭐ ⭐ ⭐ ⭐ ⭐
 
-🚨 <b>Son gün:</b> [Tarih]
-NOTE: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
+📅 <b>Son gün</b> [Tarih veya "Belirtilmemiş"]
+NOT: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
 
-🔥 Daha fazla airdrop için duyuru kanalını pinle 📌
+🔥 Daha fazla airdrop için duyuru kanalını pinle 🎉
 
 📢 @kriptodropduyuru
-🏢 @kriptodroptr"""
+🎁 @kriptodroptr"""
 
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
@@ -968,8 +980,46 @@ YAPI:
 📢 @kriptodropduyuru | 🎁 @kriptodroptr"""
 
 
-# ── Özet format ───────────────────────────────────────────────────────────────
-def get_post_system_summary() -> str:
+# ── Oyun formatı ─────────────────────────────────────────────────────────────
+def get_post_system_game() -> str:
+    return f"""Sen KriptoDropTR Telegram kanalı için Telegram oyun airdrop postları yazan bir robotsun.
+HTML parse_mode kullanılıyor. SADECE HTML ŞABLONU ÇIKTISI VER, YORUM YAPMA.
+
+KURALLAR:
+1. Adımların başında {CE['n1']}, {CE['n2']}, {CE['n3']} kullan. Asla tire veya nokta kullanma.
+2. Ödül/token bilgisi yoksa "Belirtilmemiş" yaz, uydurma yapma.
+3. ŞABLON DIŞINA ÇIKMA.
+4. Yıldızlar arası boşluk: ⭐ ⭐ ⭐ ⭐ ⭐
+
+ŞABLON:
+
+🎮 <b>[OYUN ADI] Telegram Oyun Airdrop 🎉</b>
+
+🏆 <b>[OYUN ADI] oynayarak [TOKEN/ÖDÜL] kazanma fırsatı 😊</b>
+
+🪙 <b>YAPMAN GEREKENLER:</b>
+
+{CE['n1']} [Botu başlat veya oyunu aç]
+{CE['n2']} [Görevleri veya oyun içi aktiviteleri tamamla]
+{CE['n3']} [Token veya puan biriktir]
+{CE['n4']} [Varsa: Airdrop zamanı cüzdana bağla / ödülleri talep et]
+
+➡️ <b>Oyunu Başlat:</b> 🔗 TIKLA 🔗
+➡️ <b>Etkinlik sayfası:</b> 🔗 TIKLA 🔗
+
+Görev zorluğu: [Kolay / Orta / Zor]
+Ödül miktarı: [Token adı ve miktarı]
+Oyun puanı: ⭐ ⭐ ⭐ ⭐ ⭐
+
+📅 <b>Son gün</b> [Tarih veya "Belirtilmemiş"]
+NOT: [Varsa tek cümlelik kritik not, yoksa bu satırı sil]
+
+🔥 Daha fazla airdrop için duyuru kanalını pinle 🎉
+
+📢 @kriptodropduyuru
+🎁 @kriptodroptr"""
+
+
     return f"""KriptoDropTR için 2-3 satır airdrop özeti yaz.
 HTML: <b>kalın</b> | Link: [🔗 TIKLA 🔗] | Türkçe
 
@@ -1040,6 +1090,7 @@ def _inject_premium_emojis(text: str) -> str:
         ("🔴", PREMIUM_CE.get("🔴")),
         ("🟡", PREMIUM_CE.get("🟡")),
         ("🟢", PREMIUM_CE.get("🟢")),
+        ("🎮", PREMIUM_CE.get("🎮")),
     ]
     for plain, tg in _MAP:
         # Eğer emoji zaten <tg-emoji> içindeyse replace etmemek için dikkatli olmak lazım
@@ -1056,12 +1107,14 @@ def _inject_premium_emojis(text: str) -> str:
 
 
 def build_post(analysis: str, project_name: str, fmt: str = "long", score: int = None, verdict: str = None) -> str:
-    """fmt: 'long' | 'short' | 'summary'. Skor programatik olarak eklenir."""
+    """fmt: 'long' | 'short' | 'summary' | 'game'. Skor programatik olarak eklenir."""
     prompt = _build_prompt(analysis, project_name)
     if fmt == "short":
         raw = ai(get_post_system_short(), prompt, tokens=600, temp=0.3, show_model=True)
     elif fmt == "summary":
         raw = ai(get_post_system_summary(), prompt, tokens=250, temp=0.3, show_model=True)
+    elif fmt == "game":
+        raw = ai(get_post_system_game(), prompt, tokens=1200, temp=0.3, show_model=True)
     else:
         raw = ai(get_post_system(), prompt, tokens=1400, temp=0.3, show_model=True)
 
@@ -1104,10 +1157,12 @@ def post_actions_extended(has_link: bool = False, fmt: str = "long", score=None)
     fmt_long    = "📄 Uzun ●" if fmt == "long"    else "📄 Uzun"
     fmt_short   = "📝 Kısa ●" if fmt == "short"   else "📝 Kısa"
     fmt_summary = "⚡ Özet ●" if fmt == "summary" else "⚡ Özet"
+    fmt_game    = "🎮 Oyun ●" if fmt == "game"    else "🎮 Oyun"
     rows = [
         [InlineKeyboardButton(fmt_long,    callback_data="fmt_long"),
          InlineKeyboardButton(fmt_short,   callback_data="fmt_short"),
-         InlineKeyboardButton(fmt_summary, callback_data="fmt_summary")],
+         InlineKeyboardButton(fmt_summary, callback_data="fmt_summary"),
+         InlineKeyboardButton(fmt_game,    callback_data="fmt_game")],
         [InlineKeyboardButton(link_label,  callback_data="add_link")],
         [InlineKeyboardButton("✏️ Postu Düzenle", callback_data="edit_post_inline")],
         [InlineKeyboardButton("📢 Gruba Gönder",  callback_data="send_text"),
@@ -1715,14 +1770,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 await msg.edit_text(re.sub(r'<[^>]+>', '', no_emoji), reply_markup=post_actions(has_link=False, fmt=fmt))
 
-    elif data in ("fmt_long", "fmt_short", "fmt_summary"):
+    elif data in ("fmt_long", "fmt_short", "fmt_summary", "fmt_game"):
         analysis = context.user_data.get("last_analysis")
         project  = context.user_data.get("last_project", "")
         if not analysis:
             await q.answer("⚠️ Önce bir araştırma yap.", show_alert=True)
             return
-        fmt_map   = {"fmt_long": "long", "fmt_short": "short", "fmt_summary": "summary"}
-        fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet"}
+        fmt_map   = {"fmt_long": "long", "fmt_short": "short", "fmt_summary": "summary", "fmt_game": "game"}
+        fmt_label = {"long": "📄 Uzun", "short": "📝 Kısa", "summary": "⚡ Özet", "game": "🎮 Oyun"}
         fmt = fmt_map[data]
         score_data = context.user_data.get("last_score", {})
         score   = score_data.get("score") if score_data else None
@@ -1737,7 +1792,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["final_post"] = post
         context.user_data["has_link"]   = False
         context.user_data["post_fmt"]   = fmt
-        icon = "📄" if fmt=="long" else "📝" if fmt=="short" else "⚡"
+        icon = "📄" if fmt=="long" else "📝" if fmt=="short" else "🎮" if fmt=="game" else "⚡"
         preview = f"{icon} <b>{fmt_label[fmt].upper()} FORMAT:</b>\n\n{post}\n\n🔗 <b>Link Ekle</b> butonuna bas."
         if len(preview) > 4096: preview = preview[:4086] + "..."
         try:
