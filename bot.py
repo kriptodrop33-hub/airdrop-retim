@@ -467,13 +467,24 @@ def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
         return []
 
 def _httpx_scrape(url: str) -> str:
-    """Basit HTTP scrape — URL içeriğini çek ve temizle."""
+    """İyileştirilmiş HTTP scrape — daha iyi içerik çıkarımı."""
     try:
-        r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        r = requests.get(url, timeout=15, headers=headers)
         if r.status_code == 200:
-            text = re.sub(r'<[^>]+>', ' ', r.text)
-            text = re.sub(r'\s+', ' ', text)
-            return text[:3000]
+            # HTML taglarını sil ama paragrafları ayır
+            text = re.sub(r'<script[^>]*>.*?</script>', ' ', r.text, flags=re.DOTALL)
+            text = re.sub(r'<style[^>]*>.*?</style>', ' ', text, flags=re.DOTALL)
+            text = re.sub(r'<[^>]+>', '\n', text)  # Tagları newline ile değiştir
+            text = re.sub(r'\n\s*\n', '\n', text)  # Çoklu newline'ları temizle
+            text = re.sub(r'\s+', ' ', text)  # Çoklu space'leri temizle
+            
+            # Sadece ASCII olmayan karakterleri temizle (emoji vb hariç)
+            text = text.encode('utf-8', errors='ignore').decode('utf-8')
+            
+            return text[:4000]  # 3000 → 4000
     except Exception as e:
         logger.debug(f"Scrape hata: {e}")
     return ""
@@ -483,8 +494,7 @@ _tavily_quota_ok = True
 
 def deep_search(query: str, max_results: int = 5) -> list[dict]:
     """
-    Önce Tavily dene, kota dolmuşsa DuckDuckGo'ya geç.
-    DDG: API key yok, tamamen ücretsiz, gerçek sonuçlar.
+    İyileştirilmiş arama: Tavily → DDG fallback
     """
     global _tavily_quota_ok
     if _tavily_quota_ok:
@@ -495,33 +505,44 @@ def deep_search(query: str, max_results: int = 5) -> list[dict]:
                 max_results=max_results,
                 include_answer=False,
             )
-            return r.get("results", [])
+            results = r.get("results", [])
+            if results:
+                return results
         except Exception as e:
             err_str = str(e)
             if "432" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
-                logger.warning("Tavily kotası doldu → DuckDuckGo'ya geçildi (ücretsiz, limitsiz)")
+                logger.warning("Tavily kotası doldu → DuckDuckGo'ya geçildi")
                 _tavily_quota_ok = False
             else:
-                logger.error(f"Tavily hata: {e}")
-                # Tavily başka hata verdiyse DDG'yi dene
+                logger.debug(f"Tavily hata (DDG'ye geçiliyor): {e}")
                 return _ddg_search(query, max_results)
+    
+    # DDG fallback
     return _ddg_search(query, max_results)
 
 def fetch_url_content(url: str) -> str:
-    """URL içeriğini çek — Tavily extract, yoksa httpx scrape."""
+    """İyileştirilmiş URL içeriği çekme — Tavily extract → HTTP scrape"""
     global _tavily_quota_ok
+    
+    if not url or not url.startswith("http"):
+        return ""
+    
     if _tavily_quota_ok:
         try:
             r = tavily_client.extract(urls=[url])
             results = r.get("results", [])
             if results:
-                return results[0].get("raw_content", "")[:3000]
+                content = results[0].get("raw_content", "")
+                if content:
+                    return content[:4000]  # 3000 → 4000
         except Exception as e:
             if "432" in str(e) or "quota" in str(e).lower():
                 _tavily_quota_ok = False
-                logger.warning("Tavily extract kotası doldu → httpx scrape'e geçildi")
+                logger.warning("Tavily extract kotası doldu → HTTP scrape'e geçildi")
             else:
-                logger.error(f"URL çekme hata: {e}")
+                logger.debug(f"URL çekme hata (HTTP scrape'e geçiliyor): {e}")
+    
+    # HTTP scrape fallback
     return _httpx_scrape(url)
 
 def is_url(text: str) -> bool:
@@ -656,21 +677,38 @@ Türkçe yaz. Eğer bilgi yetersizse sadece YETERSİZ BİLGİ metnini yaz."""
 # ── Fırsat arama sorguları ─────────────────────────────────────────────
 # Borsa kayıt bonusu + kampanya ağırlıklı, airdrop destekli
 OPPORTUNITY_QUERIES = [
-    # Borsa yeni kullanıcı bonusu — Türkçe borsalar dahil
-    ("bonus", "kripto borsa yeni üye kampanyası kayıt ödülü Mayıs 2026 USDT TL çekilebilir aktif başlama bitiş tarihi"),
-    ("bonus", "crypto exchange sign up bonus withdrawable reward 2026 active start end dates"),
-    ("bonus", "exchange welcome bonus reward pool distribution start end date May 2026"),
-    ("bonus", "borsa kayıt kampanyası hediye Mayıs 2026 aktif site:cointr.com OR site:paribu.com OR site:btcturk.com"),
-    # Airdrop detaylı arama
-    ("airdrop", "new crypto airdrop distribution date reward amount confirmed 2026 start end"),
-    ("airdrop", "airdrop claim date start end time tutorial May 2026 active"),
-    # Referral / davet kampanyası
-    ("referral", "crypto referral program reward per friend withdrawable 2026 dates"),
-    ("referral", "kripto borsa arkadaş davet et kazan referral ödülü Mayıs 2026 bitiş tarihi"),
-    # İşlem / trading kampanyası
-    ("kampanya", "crypto exchange trading competition prize pool distribution 2026 active dates"),
-    # Telegram / sosyal görev ödülü
-    ("sosyal", "telegram crypto bot airdrop reward amount verified 2026 start end dates"),
+    # ===== BORSA BONUSU =====
+    ("bonus", "exchange sign up bonus 2026"),
+    ("bonus", "crypto exchange welcome bonus USDT reward"),
+    ("bonus", "new user bonus kripto borsa kayıt"),
+    ("bonus", "borsa bonus 2026 Mayıs"),
+    ("bonus", "trading platform sign up reward"),
+    ("bonus", "exchange deposit bonus promotion"),
+    
+    # ===== AIRDROP =====
+    ("airdrop", "crypto airdrop 2026"),
+    ("airdrop", "token airdrop claim"),
+    ("airdrop", "free crypto airdrop"),
+    ("airdrop", "airdrop reward USDT"),
+    ("airdrop", "blockchain airdrop distribution"),
+    
+    # ===== REFERRAL =====
+    ("referral", "crypto referral program bonus"),
+    ("referral", "referral reward cryptocurrency"),
+    ("referral", "invite friends earn crypto"),
+    ("referral", "arkadaş davet et kazan"),
+    
+    # ===== KAMPANYA =====
+    ("kampanya", "crypto trading competition reward"),
+    ("kampanya", "trading contest prize pool"),
+    ("kampanya", "spot trading promotion bonus"),
+    ("kampanya", "futures trading competition"),
+    
+    # ===== SOSYAL GÖREV =====
+    ("sosyal", "telegram crypto reward"),
+    ("sosyal", "social media airdrop task"),
+    ("sosyal", "twitter crypto reward"),
+    ("sosyal", "discord crypto bonus"),
 ]
 
 
@@ -701,45 +739,68 @@ def category_filter_menu() -> InlineKeyboardMarkup:
 
 def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
     """
-    Tavily araması — cats verilirse sadece o kategorileri tara.
-    Her kategoriden en iyi 1 sorgu kullan (kredi tasarrufu).
+    Geliştirilmiş Tavily araması — her kategoriden birden fazla sorgu çalıştır.
+    Daha geniş ve kapsamlı sonuç döndür.
     """
     seen_urls  = set()
     results    = []
-    # Kategori başına sadece EN İYİ 1 sorgu çalıştır
     seen_cats  = set()
+    
+    # Kategori başına 2-3 sorgu çalıştır (kredi tasarrufu ile)
     for category, query in OPPORTUNITY_QUERIES:
         if cats and category not in cats:
             continue
-        if category in seen_cats:
-            continue  # Her kategoriden tek sorgu
-        seen_cats.add(category)
-        hits = deep_search(query, max_results=4)
-        for r in hits:
-            url = r.get("url", "")
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
-            results.append({
-                "category": category,
-                "title":    r.get("title", ""),
-                "url":      url,
-                "content":  r.get("content", "")[:1200],
-            })
-        if len(results) >= 20:
-            break  # Yeterli sonuç var, devam etme
+        
+        # Her kategoriden max 3 farklı sorgu
+        if seen_cats.get(category, 0) >= 3:
+            continue
+        
+        seen_cats[category] = seen_cats.get(category, 0) + 1
+        
+        try:
+            hits = deep_search(query, max_results=6)  # 4 → 6 (daha fazla sonuç)
+            
+            for r in hits:
+                url = r.get("url", "")
+                if not url or url in seen_urls:
+                    continue
+                
+                seen_urls.add(url)
+                
+                # URL'den tam içeriği çek (sadece snippet değil)
+                full_content = fetch_url_content(url)
+                if not full_content:
+                    full_content = r.get("content", "")
+                
+                results.append({
+                    "category": category,
+                    "title":    r.get("title", "")[:200],
+                    "url":      url,
+                    "content":  (full_content or r.get("content", ""))[:2000],  # 1200 → 2000
+                    "source":   "tavily",
+                })
+        except Exception as e:
+            logger.debug(f"Search error for '{query}': {e}")
+            continue
+        
+        # 30 sonuç bulunca dur (20 → 30)
+        if len(results) >= 30:
+            break
+    
     return results
 
 
 def scan_active_airdrops(cats: list[str] | None = None) -> str:
     """
-    Kripto kazanım fırsatı tarayıcısı.
-    cats=None → tüm kategoriler
+    GELİŞTİRİLMİŞ: Kripto kazanım fırsatı tarayıcısı.
+    - Daha geniş arama
+    - Esnek filtreleme
+    - Kısmi eşleşmeleri göster
     """
     raw_results = run_opportunity_search(cats=cats)
 
     if not raw_results:
-        return "❌ Veri çekilemedi. Lütfen tekrar deneyin."
+        return "❌ Arama sonucu bulunamadı. Tavily quota kontrol et ya da daha sonra tekrar dene."
 
     # Kategoriye göre grupla
     by_cat: dict = {}
@@ -758,42 +819,47 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
     combined_raw = ""
     for cat, items in by_cat.items():
         label = cat_labels.get(cat, cat.upper())
-        sep = "=" * 40
+        sep = "=" * 60
         combined_raw += f"\n\n{sep}\n{label}\n{sep}\n"
-        for item in items[:3]:
+        for item in items[:5]:  # 3 → 5 (daha fazla göster)
             t = item["title"]
             u = item["url"]
             c = item["content"]
-            combined_raw += f"Başlık: {t}\nURL: {u}\nİçerik: {c}\n---\n"
+            combined_raw += f"BAŞLIK: {t}\nURL: {u}\nİÇERİK:\n{c}\n{'-'*60}\n"
+    
     from datetime import datetime
-    system = f"""Sen kripto para kazanım fırsatları araştıran DİSİPLİNLİ ve KATI bir analistsin.
-Bugünün tarihi: {datetime.now().strftime('%d %B %Y')}. 
+    system = f"""Sen kripto para kazanım fırsatları araştıran bir analistsin.
+Bugün: {datetime.now().strftime('%d %B %Y')}
 
-Aşağıda internetten çekilmiş çeşitli borsa/airdrop kampanyalarının ham metinleri var.
-GÖREVİN: Sadece KURALLARA %100 UYAN fırsatları listelemek. Kurallara uymayanları ACIMASIZCA ELE ve EKRANA YAZMA!
+GÖREV: Aşağıdaki fırsatlardan en iyilerini seç ve listele.
 
-{CE['warn']} FİLTRELEME KURALLARI (İHLAL EDİLEMEZ):
-1. TARİH KURALI: Bitiş tarihi metinlerde açıkça belirtilmemişse veya {datetime.now().strftime('%d %B %Y')} tarihinden (bugün veya daha eski) geçmemişse KESİNLİKLE LİSTEYE ALMA. "Belirtilmedi" yazanları sil.
-2. ÖDÜL KURALI: Net ve kesin bir kişisel ödül rakamı yoksa (örn: "Ödül havuzdan pay", "Belirsiz", "0 USDT") KESİNLİKLE LİSTEYE ALMA.
-3. YATIRIM KURALI: 1000$ ve üzeri yatırım isteyenleri KESİNLİKLE LİSTEYE ALMA.
-4. LİSTELEME KURALI: Sadece bu testleri geçen kampanyaları listele. Geçemeyenleri asla ekrana basma.
+ÖNEMLİ: Hiçbir fırsat tarafından filtreleme yapma. Tüm bulduğun fırsatları listele!
 
-FORMAT (Uygun Olan Her Kampanya İçin):
+KONTROL NOKTALARI (ama kesinlikle gerek değil):
+- Deadline bulunabilirse göster
+- Ödül bulunabilirse göster
+- Önerilen adımlar varsa göster
+- Net olmayan bilgiler için "Belirtilmemiş" yaz (RED ETME)
+
+FORMAT (Her fırsat için):
 ━━━━━━━━━━━━━━━━━━━━━━
-{CE['check']} <b>[BORSA/PLATFORM ADI]</b>
-{CE['money']} <b>Gerçek Ödül:</b> [RAKAM - örn: 25 USDT]
-{CE['cal']} <b>Katılım Tarihleri:</b> [İlk Başlama - Son Katılım]
-{CE['target']} <b>Tür:</b> [Borsa Bonusu / Airdrop]
+{CE['check']} <b>[PLATFORM ADI]</b>
+{CE['money']} <b>Ödül:</b> [rakam veya "Belirtilmemiş"]
+{CE['cal']} <b>Deadline:</b> [tarih veya "Belirtilmemiş"]
 {CE['note']} <b>Adımlar:</b>
-{CE['n1']} [1. adım]
-{CE['n2']} [2. adım]
-{CE['n3']} [3. adım]
-{CE['star']} <b>Güvenilirlik:</b> [{CE['star']}{CE['star']}{CE['star']}{CE['star']}{CE['star']}]
-{CE['link']} <b>Katılım:</b> [URL]
+{CE['n1']} [adım 1]
+{CE['n2']} [adım 2]
+{CE['n3']} [adım 3]
+{CE['link']} <b>Kaynak:</b> [URL]
 
-Eğer kurallara uyan hiçbir kampanya yoksa sadece "Kriterlere uygun yeni fırsat bulunamadı." yaz."""
+ÖNEMLI: 
+- Hiç tarafından bitme! Bulduğun her fırsatı listele
+- Kısmi bilgiler bile sorun değil
+- Tarih yoksa "Belirtilmemiş" yaz, ATMA
+- Ödül yoksa "Belirtilmemiş" yaz, ATMA
+- Her URL'yi kapat"""
 
-    return ai(system, combined_raw[:8000], tokens=4000, show_model=True)
+    return ai(system, combined_raw[:12000], tokens=3000, show_model=True)
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
