@@ -709,6 +709,12 @@ OPPORTUNITY_QUERIES = [
     ("sosyal", "social media airdrop task"),
     ("sosyal", "twitter crypto reward"),
     ("sosyal", "discord crypto bonus"),
+    
+    # ===== DUYURU / HABER SAYFASI (YENİ) =====
+    ("bonus", "cryptocurrency exchange announcement May 2026"),
+    ("airdrop", "crypto airdrop news announcement"),
+    ("kampanya", "crypto promotion announcement official"),
+    ("bonus", "borsa duyuru kampanya 2026"),
 ]
 
 
@@ -839,13 +845,38 @@ Bugün: {datetime.now().strftime('%d %B %Y')}
 
 GÖREV: Aşağıdaki fırsatlardan en iyilerini seç ve listele.
 
-ÖNEMLİ: Hiçbir fırsat tarafından filtreleme yapma. Tüm bulduğun fırsatları listele!
+ÖNEMLİ KURALLAR:
+1. HİÇ FILTRELEME YAPMA - Tüm bulduğun fırsatları listele!
+2. KISMI BİLGİLER KABUL ET - Eksik bilgiler için "Belirtilmemiş" yaz
+3. ADIMLAR ÇIKAR - Metinde tarif edilen işlemleri kendi cümlelerinle yazın
+4. TARİH ÇIKAR - Metinde geçen tüm tarih referanslarını düşün (deadline, başlangıç, vb)
+5. ÖDÜL ÇIKAR - Kesin rakamlara odaklan (havuz değil, kişisel ödül)
+6. DUYURU/HABER SAYFASI ÇIKAR - Eğer link haber/blog/duyuru sayfasına gidiyorsa bunu belirt
 
-KONTROL NOKTALARI (ama kesinlikle gerek değil):
-- Deadline bulunabilirse göster
-- Ödül bulunabilirse göster
-- Önerilen adımlar varsa göster
-- Net olmayan bilgiler için "Belirtilmemiş" yaz (RED ETME)
+ADIM ÇIKARMAK İÇİN:
+- "sign up" → "Kayıt ol"
+- "deposit" → "[X] USDT yatırımı yap"
+- "trade" → "İşlem görevlerini tamamla"
+- "verify" / "KYC" → "Hesabını doğrula"
+- "claim" → "Ödülleri talep et"
+- Yazılan adımlar varsa, kendi cümlelerinle yeniden yaz
+
+TARİH ÇIKARMAK İÇİN:
+- "May 31", "31.05", "Mayıs 31" → Deadline
+- "Starting from May 1" → Başlama tarihi
+- Metin tarih içermiyorsa → "Belirtilmemiş"
+
+ÖDÜL ÇIKARMAK İÇİN:
+- "$100" → "100 USDT"
+- "100-500 USDT" → Aralık göster
+- "share of X pool" → HAYIR, "Belirtilmemiş" yaz
+- "deposit bonus" → Kesin rakamları ara
+
+DUYURU/HABER SAYFASI ÇIKARMAK İÇİN:
+- Eğer URL blog, news, press, announcement, article içeriyorsa → "📰 Duyuru Sayfası"
+- Eğer medium.com, blog.com, news.com vs içeriyorsa → "📰 Duyuru Sayfası"
+- Eğer resmi kaynak sitesi (örn: xt.com, coinbase.com) içeriyorsa → "🔗 Resmi Sayfa"
+- Her URL'nin türünü belirt
 
 FORMAT (Her fırsat için):
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -853,17 +884,22 @@ FORMAT (Her fırsat için):
 {CE['money']} <b>Ödül:</b> [rakam veya "Belirtilmemiş"]
 {CE['cal']} <b>Deadline:</b> [tarih veya "Belirtilmemiş"]
 {CE['note']} <b>Adımlar:</b>
-{CE['n1']} [adım 1]
-{CE['n2']} [adım 2]
-{CE['n3']} [adım 3]
-{CE['link']} <b>Kaynak:</b> [URL]
+{CE['n1']} [adım 1 - kendi cümlelerinle]
+{CE['n2']} [adım 2 - kendi cümlelerinle]
+{CE['n3']} [adım 3 - varsa]
+{CE['link']} <b>Kaynaklar:</b> [Sayfa türü ve URL]
 
-ÖNEMLI: 
-- Hiç tarafından bitme! Bulduğun her fırsatı listele
-- Kısmi bilgiler bile sorun değil
-- Tarih yoksa "Belirtilmemiş" yaz, ATMA
-- Ödül yoksa "Belirtilmemiş" yaz, ATMA
-- Her URL'yi kapat"""
+KAYNAKLAR KISMINDA:
+- 🔗 Resmi Sayfa: [URL]
+- 📰 Duyuru Sayfası: [URL]
+- 📰 Haber: [URL]
+
+ÖNEMLI HATIRLATMALAR:
+- Hiç filtreleme YAPMA! Tüm fırsatları listele
+- Adımları kendi cümlelerinle çık, özet yaparak
+- Eksik info → "Belirtilmemiş" (asla RED ETME)
+- Her URL'nin türünü belirt (Resmi / Duyuru / Haber)
+- Varsa duyuru sayfasını mutlaka ekle"""
 
         return ai(system, combined_raw[:12000], tokens=3000, show_model=True)
     
@@ -912,10 +948,7 @@ NOTE: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
 🔥 Daha fazla airdrop için duyuru kanalını pinle 📌
 
 📢 @kriptodropduyuru
-🏢 @kriptodroptr
-
-⚙️ <i>Model: Llama-3.3-70b-versatile</i>
-🕒 <i>Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"""
+🏢 @kriptodroptr"""
 
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
