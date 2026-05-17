@@ -744,7 +744,7 @@ def run_opportunity_search(cats: list[str] | None = None) -> list[dict]:
     """
     seen_urls  = set()
     results    = []
-    seen_cats  = set()
+    seen_cats  = {}  # FIX: set() → {} (dictionary olmalı, .get() için gerek)
     
     # Kategori başına 2-3 sorgu çalıştır (kredi tasarrufu ile)
     for category, query in OPPORTUNITY_QUERIES:
@@ -796,39 +796,45 @@ def scan_active_airdrops(cats: list[str] | None = None) -> str:
     - Daha geniş arama
     - Esnek filtreleme
     - Kısmi eşleşmeleri göster
+    - ERROR HANDLING iyileştirildi
     """
-    raw_results = run_opportunity_search(cats=cats)
+    try:
+        raw_results = run_opportunity_search(cats=cats)
+    except Exception as e:
+        logger.error(f"Scan error in run_opportunity_search: {e}")
+        return f"❌ Arama sırasında hata oluştu: {str(e)}\n\nLütfen tekrar deneyin."
 
     if not raw_results:
         return "❌ Arama sonucu bulunamadı. Tavily quota kontrol et ya da daha sonra tekrar dene."
 
-    # Kategoriye göre grupla
-    by_cat: dict = {}
-    for r in raw_results:
-        cat = r["category"]
-        by_cat.setdefault(cat, []).append(r)
+    try:
+        # Kategoriye göre grupla
+        by_cat: dict = {}
+        for r in raw_results:
+            cat = r.get("category", "unknown")
+            by_cat.setdefault(cat, []).append(r)
 
-    cat_labels = {
-        "bonus":    "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
-        "referral": "👥 REFERRAL / DAVET KAMPANYASI",
-        "kampanya": "🏆 İŞLEM / TRADİNG KAMPANYASI",
-        "sosyal":   "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
-        "airdrop":  "🪂 AIRDROP",
-    }
+        cat_labels = {
+            "bonus":    "🎁 BORSA KAYIT / YENİ KULLANICI BONUSU",
+            "referral": "👥 REFERRAL / DAVET KAMPANYASI",
+            "kampanya": "🏆 İŞLEM / TRADİNG KAMPANYASI",
+            "sosyal":   "📱 TELEGRAM / SOSYAL GÖREV ÖDÜLÜ",
+            "airdrop":  "🪂 AIRDROP",
+        }
 
-    combined_raw = ""
-    for cat, items in by_cat.items():
-        label = cat_labels.get(cat, cat.upper())
-        sep = "=" * 60
-        combined_raw += f"\n\n{sep}\n{label}\n{sep}\n"
-        for item in items[:5]:  # 3 → 5 (daha fazla göster)
-            t = item["title"]
-            u = item["url"]
-            c = item["content"]
-            combined_raw += f"BAŞLIK: {t}\nURL: {u}\nİÇERİK:\n{c}\n{'-'*60}\n"
-    
-    from datetime import datetime
-    system = f"""Sen kripto para kazanım fırsatları araştıran bir analistsin.
+        combined_raw = ""
+        for cat, items in by_cat.items():
+            label = cat_labels.get(cat, cat.upper())
+            sep = "=" * 60
+            combined_raw += f"\n\n{sep}\n{label}\n{sep}\n"
+            for item in items[:5]:  # 3 → 5 (daha fazla göster)
+                t = item.get("title", "Başlık yok")
+                u = item.get("url", "URL yok")
+                c = item.get("content", "İçerik yok")
+                combined_raw += f"BAŞLIK: {t}\nURL: {u}\nİÇERİK:\n{c}\n{'-'*60}\n"
+        
+        from datetime import datetime
+        system = f"""Sen kripto para kazanım fırsatları araştıran bir analistsin.
 Bugün: {datetime.now().strftime('%d %B %Y')}
 
 GÖREV: Aşağıdaki fırsatlardan en iyilerini seç ve listele.
@@ -859,7 +865,11 @@ FORMAT (Her fırsat için):
 - Ödül yoksa "Belirtilmemiş" yaz, ATMA
 - Her URL'yi kapat"""
 
-    return ai(system, combined_raw[:12000], tokens=3000, show_model=True)
+        return ai(system, combined_raw[:12000], tokens=3000, show_model=True)
+    
+    except Exception as e:
+        logger.error(f"Scan error in processing results: {e}")
+        return f"❌ Sonuçlar işlenirken hata: {str(e)}\n\nLütfen tekrar deneyin."
 
 # ══════════════════════════════════════════════════════════
 #  POST OLUŞTURMA
