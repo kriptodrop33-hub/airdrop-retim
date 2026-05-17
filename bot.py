@@ -799,7 +799,7 @@ Eğer kurallara uyan hiçbir kampanya yoksa sadece "Kriterlere uygun yeni fırsa
 #  POST OLUŞTURMA
 # ══════════════════════════════════════════════════════════
 
-# ── POST_SYSTEM: Premium emoji'li şablon ────────────────────────────────────
+# ── POST_SYSTEM: Premium emoji'li şablon (Image 3 formatı) ────────────────────────────────────
 def get_post_system() -> str:
     """POST şablonunu temiz, anlaşılır ve emojili yapıda döndür."""
     return f"""Sen KriptoDropTR Telegram kanalı için dürüst ve profesyonel airdrop postları yazan, KURALLARA KESİN UYAN bir robotsun.
@@ -807,35 +807,39 @@ HTML parse_mode kullanılıyor. SADECE HTML ŞABLONU ÇIKTISI VER, YORUM YAPMA.
 
 {CE['fire']} YAZIM KURALLARI (İHLAL EDİLEMEZ):
 1. ÖDÜL KURALI: Toplam havuz miktarlarını (örn: $19,800 havuz) KİŞİSEL ÖDÜL GİBİ YAZMA. Kullanıcının KESİN ALACAĞI net bir ödül yoksa ödülü abartma.
-2. EMOJİ KULLANIMI: Adımların başında MUHAKKAK {CE['n1']}, {CE['n2']}, {CE['n3']} kullanacaksın. Asla düz liste yapma veya nokta, tire işareti kullanma!
+2. EMOJİ KULLANIMI: Adımların başında MUHAKKAK {CE['n1']}, {CE['n2']}, {CE['n3']}, {CE['n4']} kullanacaksın. Asla düz liste yapma veya nokta, tire işareti kullanma!
 3. ŞABLON DIŞINA ÇIKMA: Alt kısımdaki şablonun virgülüne kadar aynısını üret. Şablon dışı bir cümle ekleme.
 
-ŞABLON (AŞAĞIDAKİ YAPIYI BİREBİR KOPYALA):
+ŞABLON (AŞAĞIDAKİ YAPIYI BİREBİR KOPYALA - Image 3 formatı):
 
-🎁 <b>[PLATFORM ADI] Yeni Üye Airdrop 🎉</b>
+🏢 <b>[PLATFORM ADI] Yeni İiye Airdrop 🎉</b>
 
-🏆 <b>[PLATFORM ADI] Yeni Üyeler için [NET KİŞİSEL ÖDÜL MİKTARI] kazanma fırsatı 🧐</b>
+🏆 <b>[PLATFORM ADI] Yeni Üyeler için [NET KİŞİSEL ÖDÜL MİKTARI] bonus kazanma fırsatı 😊</b>
 
-📋 <b>YAPMAN GEREKENLER:</b>
+👤 <b>YAPMAN GEREKENLER:</b>
 
-{CE['n1']} [1. Adım: Örn. Bağlantıya tıkla kayıt ol ve hesabını doğrula (KYC)]
-{CE['n2']} [2. Adım açıklaması]
-{CE['n3']} [3. Adım açıklaması]
+{CE['n1']} [1. Adım: Kısa ve net açıklama]
+{CE['n2']} [2. Adım: Kısa ve net açıklama]
+{CE['n3']} [3. Adım: Kısa ve net açıklama]
+{CE['n4']} [4. Adım varsa: Kısa ve net açıklama]
 
-➡️ Hemen Kaydol: ⚡️ TIKLA ⚡️
-➡️ Etkinlik sayfası: ⚡️ TIKLA ⚡️
----------------------------
+🏠 <b>Hemen Kaydol:</b> 🔗 TIKLA 🔗
+🏠 <b>Etkinlik sayfası:</b> 🔗 TIKLA 🔗
+_________________
 Görev zorluğu: [Kolay / Orta / Zor]
-Ödül miktarı: [Gerçek Kişisel Miktar]
-Airdrop puanı: ⭐⭐⭐⭐⭐
+Ödül miktan: [Gerçek Kişisel Miktar]
+Airdrop puanı: [Yıldızları böyle yazacaksın ⭐⭐⭐⭐⭐]
 
-📅 Son gün: [Son Katılım Tarihi]
-NOT: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
+🚨 <b>Son gün:</b> [Tarih]
+NOTE: [Varsa çok kısa tek cümlelik önemli not, yoksa bu satırı komple sil]
 
 🔥 Daha fazla airdrop için duyuru kanalını pinle 📌
 
 📢 @kriptodropduyuru
-🎁 @kriptodroptr"""
+🏢 @kriptodroptr
+
+⚙️ <i>Model: Llama-3.3-70b-versatile</i>
+🕒 <i>Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</i>"""
 
 
 # ── Kısa format ───────────────────────────────────────────────────────────────
